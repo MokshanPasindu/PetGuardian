@@ -11,7 +11,7 @@ import {
   FiMessageCircle,
   FiBookmark,
 } from 'react-icons/fi'
-import communityService from '../../services/communityService'
+import { communityService } from '../../services/communityService' 
 import Card from '../../components/common/Card'
 import Button from '../../components/common/Button'
 import Badge from '../../components/common/Badge'

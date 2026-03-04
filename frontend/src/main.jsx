@@ -6,7 +6,7 @@ import App from './App'
 import { AuthProvider } from './context/AuthContext'
 import { ThemeProvider } from './context/ThemeContext'
 import { PetProvider } from './context/PetContext'
-import './styles/index.css'
+import './styles/index.css'  
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
