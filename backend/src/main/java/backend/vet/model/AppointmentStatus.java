@@ -1,0 +1,9 @@
+package backend.vet.model;
+
+
+public enum AppointmentStatus {
+    PENDING,
+    CONFIRMED,
+    CANCELLED,
+    COMPLETED
+}

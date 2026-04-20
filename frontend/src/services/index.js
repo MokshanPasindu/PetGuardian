@@ -1,0 +1,10 @@
+// src/services/index.js
+export { default as api, aiApi } from './api'
+export { default as authService } from './authService'
+export { default as petService } from './petService'
+export { default as healthService } from './healthService'
+export { default as aiService } from './aiService'
+export { default as vetService } from './vetService'
+export { default as communityService } from './communityService'
+export { default as chatService } from './chatService'
+export { default as adminService } from './adminService' 
