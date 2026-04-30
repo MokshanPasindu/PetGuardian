@@ -128,4 +128,5 @@ const AIScanner = ({ petId, petName, onComplete }) => {
   )
 }
 
+
 export default AIScanner
