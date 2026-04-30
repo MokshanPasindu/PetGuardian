@@ -15,7 +15,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
-
+import backend.common.dto.ApiResponse;
 import java.util.List;
 
 @RestController
@@ -78,12 +78,13 @@ public class PetController {
         return ResponseEntity.ok(petService.uploadImage(id, file, user));
     }
 
-    @PostMapping("/{id}/generate-qr")
-    @Operation(summary = "Regenerate QR code for pet")
+    @PutMapping("/{id}/regenerate-qr")
+    @Operation(summary = "Regenerate QR code for a pet")
     public ResponseEntity<ApiResponse> regenerateQrCode(
             @PathVariable Long id,
             @AuthenticationPrincipal User user) {
         String newQrCode = petService.regenerateQrCode(id, user);
-        return ResponseEntity.ok(new ApiResponse(true, "QR code regenerated: " + newQrCode));
+        return ResponseEntity.ok(new ApiResponse(true, newQrCode));
     }
+
 }

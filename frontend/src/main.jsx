@@ -6,6 +6,7 @@ import App from './App'
 import { AuthProvider } from './context/AuthContext'
 import { ThemeProvider } from './context/ThemeContext'
 import { PetProvider } from './context/PetContext'
+import { NotificationProvider } from './context/NotificationContext'  // ADD THIS IMPORT
 import './styles/index.css'  
 
 ReactDOM.createRoot(document.getElementById('root')).render(
@@ -14,7 +15,9 @@ ReactDOM.createRoot(document.getElementById('root')).render(
       <ThemeProvider>
         <AuthProvider>
           <PetProvider>
-            <App />
+            <NotificationProvider>   {/* ADD THIS WRAPPER */}
+              <App />
+            </NotificationProvider>   {/* ADD THIS CLOSING TAG */}
           </PetProvider>
         </AuthProvider>
       </ThemeProvider>

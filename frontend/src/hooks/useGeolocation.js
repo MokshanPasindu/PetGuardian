@@ -1,21 +1,31 @@
 // src/hooks/useGeolocation.js
 import { useState, useEffect, useCallback } from 'react'
 
-export const useGeolocation = (options = {}) => {
+export const useGeolocation = () => {
   const [location, setLocation] = useState(null)
   const [error, setError] = useState(null)
   const [loading, setLoading] = useState(true)
 
   const getLocation = useCallback(() => {
+    setLoading(true)
+    setError(null)
+
+    // ✅ If browser doesn't support geolocation, stop immediately
     if (!navigator.geolocation) {
-      setError('Geolocation is not supported by your browser')
+      setError('Geolocation not supported')
       setLoading(false)
       return
     }
 
-    setLoading(true)
+    // ✅ Set a hard timeout - if GPS takes more than 5s, give up
+    const timeoutId = setTimeout(() => {
+      setError('Location request timed out')
+      setLoading(false)
+    }, 5000)
+
     navigator.geolocation.getCurrentPosition(
       (position) => {
+        clearTimeout(timeoutId)
         setLocation({
           lat: position.coords.latitude,
           lng: position.coords.longitude,
@@ -24,22 +34,27 @@ export const useGeolocation = (options = {}) => {
         setError(null)
         setLoading(false)
       },
-      (error) => {
-        setError(error.message)
+      (err) => {
+        clearTimeout(timeoutId)
+        setError(err.message || 'Location access denied')
         setLoading(false)
       },
       {
-        enableHighAccuracy: true,
-        timeout: 10000,
-        maximumAge: 0,
-        ...options,
+        enableHighAccuracy: false, // ✅ false = faster response
+        timeout: 5000,
+        maximumAge: 60000,        // ✅ Accept cached location up to 1 min
       }
     )
-  }, [options])
+  }, [])
 
   useEffect(() => {
     getLocation()
   }, [getLocation])
 
-  return { location, error, loading, refresh: getLocation }
+  return {
+    location,
+    error,
+    loading,
+    refresh: getLocation,
+  }
 }

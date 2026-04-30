@@ -1,7 +1,6 @@
-// src/components/ai/AIScanner.jsx
 import { useState } from 'react'
 import { motion } from 'framer-motion'
-import { FiCamera, FiUpload, FiAlertCircle } from 'react-icons/fi'
+import { FiCamera, FiAlertCircle } from 'react-icons/fi'
 import Card from '../common/Card'
 import Button from '../common/Button'
 import ImageUploader from './ImageUploader'
@@ -13,9 +12,9 @@ import toast from 'react-hot-toast'
 
 const AIScanner = ({ petId, petName, onComplete }) => {
   const [selectedImage, setSelectedImage] = useState(null)
-  const [analyzing, setAnalyzing] = useState(false)
-  const [result, setResult] = useState(null)
-  const [error, setError] = useState(null)
+  const [analyzing, setAnalyzing]         = useState(false)
+  const [result, setResult]               = useState(null)
+  const [error, setError]                 = useState(null)
 
   const handleImageSelect = (file) => {
     setSelectedImage(file)
@@ -34,17 +33,27 @@ const AIScanner = ({ petId, petName, onComplete }) => {
       toast.error('Please select an image first')
       return
     }
+    if (!petId) {
+      toast.error('No pet selected')
+      return
+    }
 
     try {
       setAnalyzing(true)
       setError(null)
-      const analysisResult = await aiService.analyzeSkinImage(selectedImage, petId)
+
+      const data = await aiService.analyzeSkinImage(selectedImage, petId)
+
+      // Spring Boot wraps response — handle both wrapped and unwrapped
+      const analysisResult = data?.data ?? data
       setResult(analysisResult)
       onComplete?.(analysisResult)
       toast.success('Analysis complete!')
+
     } catch (err) {
-      setError('Failed to analyze image. Please try again.')
-      toast.error('Analysis failed')
+      const msg = err?.response?.data?.message || 'Analysis failed. Please try again.'
+      setError(msg)
+      toast.error(msg)
     } finally {
       setAnalyzing(false)
     }
@@ -58,9 +67,11 @@ const AIScanner = ({ petId, petName, onComplete }) => {
 
   return (
     <div className="space-y-6">
-      {analyzing && <LoadingOverlay message="Analyzing image with AI..." />}
+      {analyzing && (
+        <LoadingOverlay message="AI is analyzing your image… this may take a few seconds" />
+      )}
 
-      {/* Scanner Header */}
+      {/* Header */}
       <Card className="bg-gradient-to-r from-blue-500 to-primary-500 text-white">
         <div className="flex items-center gap-4">
           <div className="w-14 h-14 rounded-xl bg-white/20 flex items-center justify-center">
@@ -75,14 +86,14 @@ const AIScanner = ({ petId, petName, onComplete }) => {
         </div>
       </Card>
 
-      {/* Error Alert */}
+      {/* Error */}
       {error && (
         <Alert variant="error" onClose={() => setError(null)}>
           {error}
         </Alert>
       )}
 
-      {/* Scanner Content */}
+      {/* Scanner or Result */}
       {!result ? (
         <Card>
           <ImageUploader
@@ -90,17 +101,16 @@ const AIScanner = ({ petId, petName, onComplete }) => {
             selectedImage={selectedImage}
             onClear={handleClearImage}
           />
-
           <div className="mt-6">
             <Button
               className="w-full"
               size="lg"
               onClick={handleAnalyze}
-              disabled={!selectedImage}
+              disabled={!selectedImage || analyzing}
               loading={analyzing}
               icon={FiCamera}
             >
-              Analyze Image
+              {analyzing ? 'Analyzing…' : 'Analyze Image'}
             </Button>
           </div>
         </Card>
@@ -110,9 +120,9 @@ const AIScanner = ({ petId, petName, onComplete }) => {
 
       {/* Disclaimer */}
       <Alert variant="info" icon={FiAlertCircle}>
-        <strong>Important:</strong> This AI analysis is for preliminary screening only and 
-        does not replace professional veterinary diagnosis. Always consult a veterinarian 
-        for proper medical advice.
+        <strong>Important:</strong> This AI analysis is for preliminary screening only.
+        It does <strong>not</strong> replace professional veterinary diagnosis.
+        Always consult a licensed veterinarian.
       </Alert>
     </div>
   )

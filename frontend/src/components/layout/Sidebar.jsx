@@ -14,6 +14,7 @@ import {
   FiCalendar,
   FiChevronRight,
   FiUserCheck,
+  FiFlag,           
 } from 'react-icons/fi'
 import { useAuth } from '../../hooks/useAuth'
 import { cn } from '../../utils/helpers'
@@ -47,8 +48,26 @@ const adminItems = [
   {
     title: 'Admin',
     items: [
-      { icon: FiShield, label: 'Admin Dashboard', path: '/admin-dashboard' },
-      { icon: FiUserCheck, label: 'User Management', path: '/admin/users' }, // ✅ Updated
+      {
+        icon: FiShield,
+        label: 'Admin Dashboard',
+        path: '/admin-dashboard',
+      },
+      {
+        icon: FiUsers,           // already imported
+        label: 'User Management',
+        path: '/admin/users',
+      },
+      {
+        icon: FiMapPin,          // already imported
+        label: 'Vet Clinics',
+        path: '/admin/vet-clinics',
+      },
+      {
+        icon: FiFlag,            // ADD THIS IMPORT
+        label: 'Content Moderation',
+        path: '/admin/content-moderation',
+      },
     ],
   },
 ]

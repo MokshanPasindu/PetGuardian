@@ -5,6 +5,7 @@ import backend.auth.dto.*;
 import backend.auth.security.JwtTokenProvider;
 import backend.common.exception.BadRequestException;
 import backend.common.exception.ResourceNotFoundException;
+import backend.notification.service.NotificationService;
 import backend.user.dto.UserDTO;
 import backend.user.model.Role;
 import backend.user.model.User;
@@ -31,6 +32,7 @@ public class AuthService {
     private final JwtTokenProvider jwtTokenProvider;
     private final AuthenticationManager authenticationManager;
 
+    private final NotificationService notificationService;
     public AuthResponse login(LoginRequest request) {
         Authentication authentication = authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(
@@ -68,6 +70,7 @@ public class AuthService {
                 .build();
 
         User savedUser = userRepository.save(user);
+        notificationService.sendWelcomeNotification(savedUser);
 
         String token = jwtTokenProvider.generateToken(savedUser.getEmail());
         String refreshToken = jwtTokenProvider.generateRefreshToken(savedUser.getEmail());

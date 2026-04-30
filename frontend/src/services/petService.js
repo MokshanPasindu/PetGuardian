@@ -2,6 +2,7 @@
 import api from './api'
 
 export const petService = {
+
   // Get all pets for current user
   getAllPets: async () => {
     try {
@@ -28,8 +29,6 @@ export const petService = {
   createPet: async (petData) => {
     try {
       const formData = new FormData()
-      
-      // Add all pet data fields
       if (petData.name) formData.append('name', petData.name)
       if (petData.type) formData.append('type', petData.type)
       if (petData.breed) formData.append('breed', petData.breed)
@@ -39,21 +38,16 @@ export const petService = {
       if (petData.color) formData.append('color', petData.color)
       if (petData.microchipId) formData.append('microchipId', petData.microchipId)
       if (petData.notes) formData.append('notes', petData.notes)
-      
-      // Add image file if provided
       if (petData.image && petData.image instanceof File) {
         formData.append('image', petData.image)
       }
 
       const response = await api.post('/pets', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
+        headers: { 'Content-Type': 'multipart/form-data' },
       })
       return response.data
     } catch (error) {
       console.error('Create Pet Error:', error)
-      console.error('Error details:', error.response?.data)
       throw new Error(error.response?.data?.message || 'Failed to create pet')
     }
   },
@@ -62,8 +56,6 @@ export const petService = {
   updatePet: async (id, petData) => {
     try {
       const formData = new FormData()
-      
-      // Add all pet data fields
       if (petData.name !== undefined) formData.append('name', petData.name)
       if (petData.type !== undefined) formData.append('type', petData.type)
       if (petData.breed !== undefined) formData.append('breed', petData.breed)
@@ -73,16 +65,12 @@ export const petService = {
       if (petData.color !== undefined) formData.append('color', petData.color)
       if (petData.microchipId !== undefined) formData.append('microchipId', petData.microchipId)
       if (petData.notes !== undefined) formData.append('notes', petData.notes)
-      
-      // Add image file if provided
       if (petData.image && petData.image instanceof File) {
         formData.append('image', petData.image)
       }
 
       const response = await api.put(`/pets/${id}`, formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
+        headers: { 'Content-Type': 'multipart/form-data' },
       })
       return response.data
     } catch (error) {
@@ -102,9 +90,12 @@ export const petService = {
     }
   },
 
-  // Get pet by QR code (public)
+  // ─── QR Methods (Fixed) ───────────────────────────────────────────────────
+
+  // Get public pet profile by QR code (no auth needed)
   getPetByQRCode: async (qrCode) => {
     try {
+      // Calls GET /qr/pet/{qrCode} → returns PublicPetProfileDTO
       const response = await api.get(`/qr/pet/${qrCode}`)
       return response.data
     } catch (error) {
@@ -113,15 +104,23 @@ export const petService = {
     }
   },
 
-  // Generate QR code for pet
-  generateQRCode: async (petId) => {
+  // Regenerate QR code for a pet (owner only)
+  // Calls PUT /pets/{id}/regenerate-qr → matches PetService.regenerateQrCode()
+  regenerateQRCode: async (petId) => {
     try {
-      const response = await api.post(`/pets/${petId}/generate-qr`)
-      return response.data
+      const response = await api.put(`/pets/${petId}/regenerate-qr`)
+      return response.data // returns new qrCode string
     } catch (error) {
-      console.error('Generate QR Error:', error)
-      throw new Error(error.response?.data?.message || 'Failed to generate QR code')
+      console.error('Regenerate QR Error:', error)
+      throw new Error(error.response?.data?.message || 'Failed to regenerate QR code')
     }
+  },
+
+  // Get QR code image as blob URL (for display/download)
+  // Calls GET /qr/generate/{qrCode} → returns PNG image bytes
+  getQRCodeImageUrl: (qrCode, width = 300, height = 300) => {
+    const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8080/api'
+    return `${baseUrl}/qr/generate/${qrCode}?width=${width}&height=${height}`
   },
 
   // Upload pet image separately
@@ -129,11 +128,8 @@ export const petService = {
     try {
       const formData = new FormData()
       formData.append('file', imageFile)
-
       const response = await api.post(`/pets/${petId}/image`, formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
+        headers: { 'Content-Type': 'multipart/form-data' },
       })
       return response.data
     } catch (error) {

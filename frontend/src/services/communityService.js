@@ -2,22 +2,19 @@
 import api from './api'
 
 export const communityService = {
-  // Get all posts with filters
+
+  // ─── FIXED: Now returns full PagedResponse (content + totalPages etc) ──────
   getPosts: async (category = 'all', sortBy = 'recent', page = 0, size = 10) => {
     try {
       const params = { page, size, sort: sortBy }
-      
+
       if (category && category !== 'all') {
         params.category = category.toUpperCase()
       }
-      
+
       const response = await api.get('/community/posts', { params })
-      
-      if (response.data.content) {
-        return response.data.content
-      }
+      // ✅ Return full response so CommunityHome gets totalPages/totalElements
       return response.data
-      
     } catch (error) {
       console.error('Get Posts Error:', error)
       throw new Error(error.response?.data?.message || 'Failed to fetch posts')
@@ -35,11 +32,11 @@ export const communityService = {
     }
   },
 
-  // ✅ NEW: Get posts by tags
+  // Get posts by tags
   getPostsByTags: async (tags, page = 0, size = 10) => {
     try {
       const response = await api.get('/community/posts/by-tags', {
-        params: { tags, page, size }
+        params: { tags, page, size },
       })
       return response.data
     } catch (error) {
@@ -52,7 +49,7 @@ export const communityService = {
   searchPosts: async (query, page = 0, size = 10) => {
     try {
       const response = await api.get('/community/posts/search', {
-        params: { query, page, size }
+        params: { query, page, size },
       })
       return response.data
     } catch (error) {
@@ -65,28 +62,21 @@ export const communityService = {
   createPost: async (postData) => {
     try {
       const formData = new FormData()
-      
       formData.append('title', postData.title)
       formData.append('content', postData.content)
       formData.append('category', postData.category.toUpperCase())
-      
-      // ✅ NEW: Add tags
+
       if (postData.tags && postData.tags.length > 0) {
-        postData.tags.forEach(tag => {
-          formData.append('tags', tag)
-        })
+        postData.tags.forEach((tag) => formData.append('tags', tag))
       }
-      
+
       if (postData.images && postData.images.length > 0) {
         formData.append('image', postData.images[0])
       }
 
       const response = await api.post('/community/posts', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
+        headers: { 'Content-Type': 'multipart/form-data' },
       })
-      
       return response.data
     } catch (error) {
       console.error('Create Post Error:', error)
@@ -98,26 +88,21 @@ export const communityService = {
   updatePost: async (postId, postData) => {
     try {
       const formData = new FormData()
-      
       if (postData.title) formData.append('title', postData.title)
       if (postData.content) formData.append('content', postData.content)
-      if (postData.category) formData.append('category', postData.category.toUpperCase())
-      
-      // ✅ NEW: Add tags
+      if (postData.category)
+        formData.append('category', postData.category.toUpperCase())
+
       if (postData.tags && postData.tags.length > 0) {
-        postData.tags.forEach(tag => {
-          formData.append('tags', tag)
-        })
+        postData.tags.forEach((tag) => formData.append('tags', tag))
       }
-      
+
       if (postData.images && postData.images.length > 0) {
         formData.append('image', postData.images[0])
       }
 
       const response = await api.put(`/community/posts/${postId}`, formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
+        headers: { 'Content-Type': 'multipart/form-data' },
       })
       return response.data
     } catch (error) {
@@ -148,11 +133,11 @@ export const communityService = {
     }
   },
 
-  // ✅ NEW: Flag post
+  // Flag post
   flagPost: async (postId, reason) => {
     try {
       const response = await api.post(`/community/posts/${postId}/flag`, {
-        reason
+        reason,
       })
       return response.data
     } catch (error) {
@@ -176,7 +161,7 @@ export const communityService = {
   addComment: async (postId, content) => {
     try {
       const response = await api.post(`/community/posts/${postId}/comments`, {
-        content: content
+        content,
       })
       return response.data
     } catch (error) {
@@ -185,7 +170,7 @@ export const communityService = {
     }
   },
 
-  // ✅ NEW: Add reply to comment
+  // Add reply to comment
   addReply: async (postId, commentId, content) => {
     try {
       const response = await api.post(
@@ -199,7 +184,7 @@ export const communityService = {
     }
   },
 
-  // ✅ NEW: Update comment
+  // Update comment
   updateComment: async (postId, commentId, content) => {
     try {
       const response = await api.put(
@@ -216,7 +201,9 @@ export const communityService = {
   // Delete comment
   deleteComment: async (postId, commentId) => {
     try {
-      const response = await api.delete(`/community/posts/${postId}/comments/${commentId}`)
+      const response = await api.delete(
+        `/community/posts/${postId}/comments/${commentId}`
+      )
       return response.data
     } catch (error) {
       console.error('Delete Comment Error:', error)
@@ -227,7 +214,9 @@ export const communityService = {
   // Like a comment (toggle)
   likeComment: async (postId, commentId) => {
     try {
-      const response = await api.post(`/community/posts/${postId}/comments/${commentId}/like`)
+      const response = await api.post(
+        `/community/posts/${postId}/comments/${commentId}/like`
+      )
       return response.data
     } catch (error) {
       console.error('Like Comment Error:', error)
@@ -235,23 +224,27 @@ export const communityService = {
     }
   },
 
-  // ✅ NEW: Admin - Get flagged posts
+  // Admin - Get flagged posts
   getFlaggedPosts: async (page = 0, size = 10) => {
     try {
       const response = await api.get('/community/admin/flagged-posts', {
-        params: { page, size }
+        params: { page, size },
       })
       return response.data
     } catch (error) {
       console.error('Get Flagged Posts Error:', error)
-      throw new Error(error.response?.data?.message || 'Failed to fetch flagged posts')
+      throw new Error(
+        error.response?.data?.message || 'Failed to fetch flagged posts'
+      )
     }
   },
 
-  // ✅ NEW: Admin - Unflag post
+  // Admin - Unflag post
   unflagPost: async (postId) => {
     try {
-      const response = await api.put(`/community/admin/posts/${postId}/unflag`)
+      const response = await api.put(
+        `/community/admin/posts/${postId}/unflag`
+      )
       return response.data
     } catch (error) {
       console.error('Unflag Post Error:', error)
@@ -259,7 +252,7 @@ export const communityService = {
     }
   },
 
-  // ✅ NEW: Admin - Delete post
+  // Admin - Delete post
   deletePostByAdmin: async (postId) => {
     try {
       const response = await api.delete(`/community/admin/posts/${postId}`)

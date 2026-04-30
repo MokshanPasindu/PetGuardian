@@ -1,136 +1,142 @@
-// src/services/vetService.js
 import api from './api'
 
 export const vetService = {
-  // Get nearby vets based on location
+
+  // ═══════════════════════════════════════════════════════════
+  // VET CLINICS
+  // ═══════════════════════════════════════════════════════════
+
+  getAllVets: async () => {
+    const r = await api.get('/vets')
+    return r.data
+  },
+
   getNearbyVets: async (latitude, longitude, radius = 10) => {
     try {
-      const response = await api.post('/vets/nearby', {
-        latitude,
-        longitude,
-        radius,
+      const r = await api.get('/vets/nearby', {
+        params: { lat: latitude, lng: longitude, radius },
       })
-      return response.data
-    } catch (error) {
-      console.error('Get Nearby Vets Error:', error)
-      throw new Error(error.response?.data?.message || 'Failed to get nearby vets')
-    }
+      return r.data
+    } catch { return [] }
   },
 
-  // Get all vets with filters
-  getAllVets: async (filters = {}) => {
-    try {
-      const response = await api.get('/vets/search', { params: filters })
-      return response.data
-    } catch (error) {
-      console.error('Get All Vets Error:', error)
-      throw new Error(error.response?.data?.message || 'Failed to get vets')
-    }
-  },
-
-  // Get vet by ID
   getVetById: async (id) => {
-    try {
-      const response = await api.get(`/vets/${id}`)
-      return response.data
-    } catch (error) {
-      console.error('Get Vet Error:', error)
-      throw new Error(error.response?.data?.message || 'Failed to get vet details')
-    }
+    const r = await api.get(`/vets/${id}`)
+    return r.data
   },
 
-  // Create vet clinic (admin/vet only)
-  createVet: async (vetData) => {
+  getEmergencyVets: async () => {
     try {
-      const response = await api.post('/vets', vetData)
-      return response.data
-    } catch (error) {
-      console.error('Create Vet Error:', error)
-      throw new Error(error.response?.data?.message || 'Failed to create vet clinic')
-    }
+      const r = await api.get('/vets/emergency')
+      return r.data
+    } catch { return [] }
   },
 
-  // Update vet clinic
-  updateVet: async (id, vetData) => {
+  searchVets: async (query) => {
     try {
-      const response = await api.put(`/vets/${id}`, vetData)
-      return response.data
-    } catch (error) {
-      console.error('Update Vet Error:', error)
-      throw new Error(error.response?.data?.message || 'Failed to update vet clinic')
-    }
+      const r = await api.get('/vets/search', { params: { query } })
+      return r.data
+    } catch { return [] }
   },
 
-  // Delete vet clinic
-  deleteVet: async (id) => {
-    try {
-      const response = await api.delete(`/vets/${id}`)
-      return response.data
-    } catch (error) {
-      console.error('Delete Vet Error:', error)
-      throw new Error(error.response?.data?.message || 'Failed to delete vet clinic')
-    }
-  },
+  // ═══════════════════════════════════════════════════════════
+  // OWNER APPOINTMENTS
+  // ═══════════════════════════════════════════════════════════
 
-  // Appointments
   getAppointments: async () => {
+    const r = await api.get('/appointments')
+    return r.data
+  },
+
+  getPendingAppointments: async () => {
     try {
-      const response = await api.get('/appointments')
-      return response.data
-    } catch (error) {
-      console.error('Get Appointments Error:', error)
-      throw new Error(error.response?.data?.message || 'Failed to get appointments')
-    }
+      const r = await api.get('/appointments/pending')
+      return r.data
+    } catch { return [] }
   },
 
   getAppointmentById: async (id) => {
-    try {
-      const response = await api.get(`/appointments/${id}`)
-      return response.data
-    } catch (error) {
-      console.error('Get Appointment Error:', error)
-      throw new Error(error.response?.data?.message || 'Failed to get appointment')
-    }
+    const r = await api.get(`/appointments/${id}`)
+    return r.data
   },
 
-  createAppointment: async (appointmentData) => {
-    try {
-      const response = await api.post('/appointments', appointmentData)
-      return response.data
-    } catch (error) {
-      console.error('Create Appointment Error:', error)
-      throw new Error(error.response?.data?.message || 'Failed to create appointment')
-    }
+  createAppointment: async (data) => {
+    const r = await api.post('/appointments', data)
+    return r.data
   },
 
-  updateAppointment: async (id, appointmentData) => {
-    try {
-      const response = await api.put(`/appointments/${id}`, appointmentData)
-      return response.data
-    } catch (error) {
-      console.error('Update Appointment Error:', error)
-      throw new Error(error.response?.data?.message || 'Failed to update appointment')
-    }
+  updateAppointmentStatus: async (id, status) => {
+    const r = await api.patch(`/appointments/${id}/status`, null, {
+      params: { status },
+    })
+    return r.data
   },
 
   cancelAppointment: async (id) => {
-    try {
-      const response = await api.patch(`/appointments/${id}/cancel`)
-      return response.data
-    } catch (error) {
-      console.error('Cancel Appointment Error:', error)
-      throw new Error(error.response?.data?.message || 'Failed to cancel appointment')
-    }
+    const r = await api.delete(`/appointments/${id}`)
+    return r.data
   },
 
-  deleteAppointment: async (id) => {
-    try {
-      const response = await api.delete(`/appointments/${id}`)
-      return response.data
-    } catch (error) {
-      console.error('Delete Appointment Error:', error)
-      throw new Error(error.response?.data?.message || 'Failed to delete appointment')
-    }
+  // ═══════════════════════════════════════════════════════════
+  // VET APPOINTMENTS
+  // ═══════════════════════════════════════════════════════════
+
+  // GET /appointments/vet/dashboard
+  getVetDashboard: async () => {
+    const r = await api.get('/appointments/vet/dashboard')
+    return r.data
+  },
+
+  // GET /appointments/vet/all
+  getVetAllAppointments: async () => {
+    const r = await api.get('/appointments/vet/all')
+    return r.data
+  },
+
+  // GET /appointments/vet/today
+  getVetTodayAppointments: async () => {
+    const r = await api.get('/appointments/vet/today')
+    return r.data
+  },
+
+  // GET /appointments/vet/pending
+  getVetPendingAppointments: async () => {
+    const r = await api.get('/appointments/vet/pending')
+    return r.data
+  },
+
+  // GET /appointments/vet/date?date=2024-01-15
+  getVetAppointmentsByDate: async (date) => {
+    const r = await api.get('/appointments/vet/date', {
+      params: { date },
+    })
+    return r.data
+  },
+
+  // PATCH /appointments/vet/{id}/confirm
+  confirmAppointment: async (id) => {
+    const r = await api.patch(`/appointments/vet/${id}/confirm`)
+    return r.data
+  },
+
+  // PATCH /appointments/vet/{id}/complete
+  completeAppointment: async (id) => {
+    const r = await api.patch(`/appointments/vet/${id}/complete`)
+    return r.data
+  },
+
+  // PATCH /appointments/vet/{id}/cancel
+  vetCancelAppointment: async (id) => {
+    const r = await api.patch(`/appointments/vet/${id}/cancel`)
+    return r.data
+  },
+
+  // PATCH /appointments/vet/{id}/notes
+  addVetNotes: async (id, notes) => {
+    const r = await api.patch(`/appointments/vet/${id}/notes`, null, {
+      params: { notes },
+    })
+    return r.data
   },
 }
 

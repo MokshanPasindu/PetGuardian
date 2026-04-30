@@ -1,122 +1,167 @@
-// src/components/layout/Navbar.jsx
-import { useState } from 'react'
-import { Link, useLocation } from 'react-router-dom'
+import { useState, useRef, useEffect } from 'react'
+import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
-  FiMenu,
-  FiX,
-  FiBell,
-  FiSearch,
-  FiMoon,
-  FiSun,
-  FiUser,
-  FiSettings,
-  FiLogOut,
-  FiChevronDown,
+  FiMenu, FiX, FiBell, FiSearch,
+  FiMoon, FiSun, FiUser, FiSettings,
+  FiLogOut, FiChevronDown, FiTrash2,
+  FiCheckCircle,
 } from 'react-icons/fi'
 import { useAuth } from '../../hooks/useAuth'
 import { useTheme } from '../../context/ThemeContext'
+import { useNotifications, getNotificationConfig }
+  from '../../context/NotificationContext'
 import Avatar from '../common/Avatar'
 
+// ── Time formatter ─────────────────────────────────────────
+const timeAgo = (dateStr) => {
+  if (!dateStr) return ''
+  const diff = Date.now() - new Date(dateStr).getTime()
+  const mins  = Math.floor(diff / 60000)
+  const hours = Math.floor(diff / 3600000)
+  const days  = Math.floor(diff / 86400000)
+  if (mins  <  1) return 'just now'
+  if (mins  < 60) return `${mins}m ago`
+  if (hours < 24) return `${hours}h ago`
+  if (days  <  7) return `${days}d ago`
+  return new Date(dateStr).toLocaleDateString()
+}
+
 const Navbar = ({ onMenuClick, isSidebarOpen }) => {
-  const { user, logout } = useAuth()
+  const { user, logout }            = useAuth()
   const { darkMode, toggleDarkMode } = useTheme()
-  const location = useLocation()
-  const [showUserMenu, setShowUserMenu] = useState(false)
+  const navigate                     = useNavigate()
+  const {
+    notifications,
+    unreadCount,
+    markAsRead,
+    markAllAsRead,
+    removeNotification,
+    clearRead,
+  } = useNotifications()
+
+  const [showUserMenu, setShowUserMenu]           = useState(false)
   const [showNotifications, setShowNotifications] = useState(false)
-  const [searchQuery, setSearchQuery] = useState('')
+  const [searchQuery, setSearchQuery]             = useState('')
 
-  const notifications = [
-    {
-      id: 1,
-      title: 'Vaccination Reminder',
-      message: "Max's rabies vaccination is due in 3 days",
-      time: '2 hours ago',
-      unread: true,
-    },
-    {
-      id: 2,
-      title: 'AI Scan Complete',
-      message: 'Your recent skin scan results are ready',
-      time: '5 hours ago',
-      unread: true,
-    },
-    {
-      id: 3,
-      title: 'Community Response',
-      message: 'Someone replied to your post',
-      time: '1 day ago',
-      unread: false,
-    },
-  ]
+  const notifRef = useRef(null)
+  const userRef  = useRef(null)
 
-  const unreadCount = notifications.filter((n) => n.unread).length
+  // ── Close dropdowns on outside click ──────────────────────
+  useEffect(() => {
+    const handler = (e) => {
+      if (notifRef.current && !notifRef.current.contains(e.target)) {
+        setShowNotifications(false)
+      }
+      if (userRef.current && !userRef.current.contains(e.target)) {
+        setShowUserMenu(false)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
+
+  // ── Handle notification click ──────────────────────────────
+  const handleNotificationClick = async (notification) => {
+    if (!notification.read) {
+      await markAsRead(notification.id)
+    }
+    if (notification.actionUrl) {
+      setShowNotifications(false)
+      navigate(notification.actionUrl)
+    }
+  }
+
+  // ── User display name ──────────────────────────────────────
+  const displayName = user?.firstName
+    ? `${user.firstName} ${user.lastName ?? ''}`.trim()
+    : user?.email ?? 'User'
+
+  const firstName = user?.firstName ?? user?.email?.split('@')[0] ?? 'User'
 
   return (
-    <nav className="fixed top-0 left-0 right-0 z-40 bg-white/80 dark:bg-gray-900/80 backdrop-blur-lg border-b border-gray-200 dark:border-gray-800">
+    <nav className="fixed top-0 left-0 right-0 z-40
+                    bg-white/80 dark:bg-gray-900/80
+                    backdrop-blur-lg border-b
+                    border-gray-200 dark:border-gray-800">
       <div className="flex items-center justify-between h-16 px-4 lg:px-6">
-        {/* Left Section */}
+
+        {/* ── Left ── */}
         <div className="flex items-center gap-4">
           <button
             onClick={onMenuClick}
-            className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 lg:hidden transition-colors"
+            className="p-2 rounded-lg hover:bg-gray-100
+                       dark:hover:bg-gray-800 lg:hidden transition-colors"
           >
-            {isSidebarOpen ? (
-              <FiX className="w-6 h-6" />
-            ) : (
-              <FiMenu className="w-6 h-6" />
-            )}
+            {isSidebarOpen
+              ? <FiX className="w-6 h-6" />
+              : <FiMenu className="w-6 h-6" />}
           </button>
 
           <Link to="/dashboard" className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary-500 to-primary-600 flex items-center justify-center">
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br
+                            from-primary-500 to-primary-600
+                            flex items-center justify-center">
               <span className="text-white font-bold text-lg">🐾</span>
             </div>
-            <span className="hidden sm:block text-xl font-display font-bold text-gray-900 dark:text-white">
+            <span className="hidden sm:block text-xl font-display
+                             font-bold text-gray-900 dark:text-white">
               PetGuardian
             </span>
           </Link>
         </div>
 
-        {/* Center - Search */}
+        {/* ── Center Search ── */}
         <div className="hidden md:flex flex-1 max-w-md mx-8">
           <div className="relative w-full">
-            <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+            <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2
+                                 w-5 h-5 text-gray-400" />
             <input
               type="text"
               placeholder="Search pets, records, vets..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 bg-gray-100 dark:bg-gray-800 rounded-xl border-none focus:outline-none focus:ring-2 focus:ring-primary-500 text-gray-900 dark:text-white placeholder-gray-500"
+              className="w-full pl-10 pr-4 py-2 bg-gray-100
+                         dark:bg-gray-800 rounded-xl border-none
+                         focus:outline-none focus:ring-2
+                         focus:ring-primary-500 text-gray-900
+                         dark:text-white placeholder-gray-500"
             />
           </div>
         </div>
 
-        {/* Right Section */}
+        {/* ── Right ── */}
         <div className="flex items-center gap-2">
+
           {/* Theme Toggle */}
           <button
             onClick={toggleDarkMode}
-            className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+            className="p-2 rounded-lg hover:bg-gray-100
+                       dark:hover:bg-gray-800 transition-colors"
           >
-            {darkMode ? (
-              <FiSun className="w-5 h-5 text-yellow-500" />
-            ) : (
-              <FiMoon className="w-5 h-5 text-gray-600" />
-            )}
+            {darkMode
+              ? <FiSun  className="w-5 h-5 text-yellow-500" />
+              : <FiMoon className="w-5 h-5 text-gray-600" />}
           </button>
 
-          {/* Notifications */}
-          <div className="relative">
+          {/* ── Notifications ── */}
+          <div className="relative" ref={notifRef}>
             <button
-              onClick={() => setShowNotifications(!showNotifications)}
-              className="relative p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+              onClick={() => setShowNotifications(v => !v)}
+              className="relative p-2 rounded-lg hover:bg-gray-100
+                         dark:hover:bg-gray-800 transition-colors"
             >
-              <FiBell className="w-5 h-5" />
+              <FiBell className="w-5 h-5 text-gray-600 dark:text-gray-300" />
               {unreadCount > 0 && (
-                <span className="absolute top-1 right-1 w-4 h-4 bg-danger-500 text-white text-xs rounded-full flex items-center justify-center">
-                  {unreadCount}
-                </span>
+                <motion.span
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1 }}
+                  className="absolute top-1 right-1 min-w-[18px] h-[18px]
+                             bg-red-500 text-white text-xs rounded-full
+                             flex items-center justify-center px-1 font-bold"
+                >
+                  {unreadCount > 99 ? '99+' : unreadCount}
+                </motion.span>
               )}
             </button>
 
@@ -126,66 +171,171 @@ const Navbar = ({ onMenuClick, isSidebarOpen }) => {
                   initial={{ opacity: 0, y: 10, scale: 0.95 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                  className="absolute right-0 mt-2 w-80 bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 overflow-hidden"
+                  transition={{ duration: 0.15 }}
+                  className="absolute right-0 mt-2 w-96 bg-white
+                             dark:bg-gray-800 rounded-2xl shadow-xl
+                             border border-gray-200 dark:border-gray-700
+                             overflow-hidden z-50"
                 >
-                  <div className="p-4 border-b border-gray-200 dark:border-gray-700">
-                    <h3 className="font-semibold text-gray-900 dark:text-white">
-                      Notifications
-                    </h3>
+                  {/* Header */}
+                  <div className="flex items-center justify-between
+                                  p-4 border-b border-gray-200
+                                  dark:border-gray-700">
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-semibold text-gray-900
+                                     dark:text-white">
+                        Notifications
+                      </h3>
+                      {unreadCount > 0 && (
+                        <span className="px-2 py-0.5 bg-red-100
+                                         dark:bg-red-900/30 text-red-600
+                                         dark:text-red-400 text-xs
+                                         font-bold rounded-full">
+                          {unreadCount} new
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {unreadCount > 0 && (
+                        <button
+                          onClick={markAllAsRead}
+                          className="text-xs text-primary-600
+                                     dark:text-primary-400
+                                     hover:underline flex items-center gap-1"
+                        >
+                          <FiCheckCircle className="w-3 h-3" />
+                          Mark all read
+                        </button>
+                      )}
+                      {notifications.some(n => n.read) && (
+                        <button
+                          onClick={clearRead}
+                          className="text-xs text-gray-400
+                                     hover:text-red-500 transition-colors"
+                          title="Clear read notifications"
+                        >
+                          <FiTrash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
                   </div>
-                  <div className="max-h-96 overflow-y-auto">
-                    {notifications.map((notification) => (
-                      <div
-                        key={notification.id}
-                        className={`p-4 hover:bg-gray-50 dark:hover:bg-gray-700/50 cursor-pointer border-b border-gray-100 dark:border-gray-700 last:border-0 ${
-                          notification.unread ? 'bg-primary-50/50 dark:bg-primary-900/10' : ''
-                        }`}
-                      >
-                        <div className="flex items-start gap-3">
-                          {notification.unread && (
-                            <span className="w-2 h-2 mt-2 bg-primary-500 rounded-full flex-shrink-0" />
-                          )}
-                          <div className={notification.unread ? '' : 'ml-5'}>
-                            <p className="font-medium text-gray-900 dark:text-white text-sm">
-                              {notification.title}
-                            </p>
-                            <p className="text-gray-600 dark:text-gray-400 text-sm mt-1">
-                              {notification.message}
-                            </p>
-                            <p className="text-gray-400 dark:text-gray-500 text-xs mt-1">
-                              {notification.time}
-                            </p>
-                          </div>
-                        </div>
+
+                  {/* List */}
+                  <div className="max-h-[420px] overflow-y-auto">
+                    {notifications.length === 0 ? (
+                      <div className="py-12 text-center">
+                        <FiBell className="w-10 h-10 mx-auto text-gray-300
+                                           dark:text-gray-600 mb-3" />
+                        <p className="text-gray-500 dark:text-gray-400 text-sm">
+                          No notifications yet
+                        </p>
                       </div>
-                    ))}
+                    ) : (
+                      notifications.map((n) => {
+                        const cfg = getNotificationConfig(n.type)
+                        return (
+                          <div
+                            key={n.id}
+                            className={`
+                              group flex items-start gap-3 p-4
+                              border-b border-gray-100 dark:border-gray-700
+                              last:border-0 cursor-pointer
+                              transition-colors hover:bg-gray-50
+                              dark:hover:bg-gray-700/50
+                              ${!n.read
+                                ? 'bg-primary-50/40 dark:bg-primary-900/10'
+                                : ''}
+                            `}
+                            onClick={() => handleNotificationClick(n)}
+                          >
+                            {/* Icon */}
+                            <div className={`w-9 h-9 rounded-xl ${cfg.bg}
+                                            flex items-center justify-center
+                                            flex-shrink-0 text-lg`}>
+                              {cfg.icon}
+                            </div>
+
+                            {/* Content */}
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-start justify-between gap-2">
+                                <p className={`text-sm font-medium
+                                              text-gray-900 dark:text-white
+                                              leading-tight
+                                              ${!n.read ? 'font-semibold' : ''}`}>
+                                  {n.title}
+                                </p>
+                                {/* Unread dot */}
+                                {!n.read && (
+                                  <span className="w-2 h-2 bg-primary-500
+                                                   rounded-full flex-shrink-0
+                                                   mt-1" />
+                                )}
+                              </div>
+                              <p className="text-xs text-gray-500
+                                            dark:text-gray-400 mt-0.5
+                                            line-clamp-2">
+                                {n.message}
+                              </p>
+                              <p className="text-xs text-gray-400
+                                            dark:text-gray-500 mt-1">
+                                {timeAgo(n.createdAt)}
+                              </p>
+                            </div>
+
+                            {/* Delete button */}
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                removeNotification(n.id)
+                              }}
+                              className="opacity-0 group-hover:opacity-100
+                                         p-1 text-gray-400 hover:text-red-500
+                                         transition-all rounded flex-shrink-0"
+                              title="Delete"
+                            >
+                              <FiX className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        )
+                      })
+                    )}
                   </div>
-                  <div className="p-3 border-t border-gray-200 dark:border-gray-700">
-                    <button className="w-full text-center text-sm text-primary-600 dark:text-primary-400 font-medium hover:underline">
-                      View all notifications
-                    </button>
-                  </div>
+
+                  {/* Footer */}
+                  {notifications.length > 0 && (
+                    <div className="p-3 border-t border-gray-200
+                                    dark:border-gray-700 text-center">
+                      <span className="text-xs text-gray-400">
+                        {notifications.length} notification
+                        {notifications.length !== 1 ? 's' : ''} total
+                      </span>
+                    </div>
+                  )}
                 </motion.div>
               )}
             </AnimatePresence>
           </div>
 
-          {/* User Menu */}
-          <div className="relative">
+          {/* ── User Menu ── */}
+          <div className="relative" ref={userRef}>
             <button
-              onClick={() => setShowUserMenu(!showUserMenu)}
-              className="flex items-center gap-2 p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+              onClick={() => setShowUserMenu(v => !v)}
+              className="flex items-center gap-2 p-1.5 rounded-lg
+                         hover:bg-gray-100 dark:hover:bg-gray-800
+                         transition-colors"
             >
               <Avatar
                 src={user?.avatar}
-                name={user?.name}
+                name={displayName}
                 size="sm"
                 status="online"
               />
-              <span className="hidden md:block text-sm font-medium text-gray-700 dark:text-gray-300">
-                {user?.name?.split(' ')[0]}
+              <span className="hidden md:block text-sm font-medium
+                               text-gray-700 dark:text-gray-300">
+                {firstName}
               </span>
-              <FiChevronDown className="hidden md:block w-4 h-4 text-gray-400" />
+              <FiChevronDown className="hidden md:block w-4 h-4
+                                        text-gray-400" />
             </button>
 
             <AnimatePresence>
@@ -194,44 +344,69 @@ const Navbar = ({ onMenuClick, isSidebarOpen }) => {
                   initial={{ opacity: 0, y: 10, scale: 0.95 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                  className="absolute right-0 mt-2 w-56 bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 overflow-hidden"
+                  transition={{ duration: 0.15 }}
+                  className="absolute right-0 mt-2 w-56 bg-white
+                             dark:bg-gray-800 rounded-xl shadow-lg
+                             border border-gray-200 dark:border-gray-700
+                             overflow-hidden z-50"
                 >
-                  <div className="p-4 border-b border-gray-200 dark:border-gray-700">
-                    <p className="font-semibold text-gray-900 dark:text-white">
-                      {user?.name}
+                  {/* User info */}
+                  <div className="p-4 border-b border-gray-200
+                                  dark:border-gray-700">
+                    <p className="font-semibold text-gray-900 dark:text-white
+                                  truncate">
+                      {displayName}
                     </p>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                    <p className="text-sm text-gray-500 dark:text-gray-400
+                                  truncate">
                       {user?.email}
                     </p>
+                    <span className="inline-block mt-1 px-2 py-0.5
+                                     bg-primary-100 dark:bg-primary-900/30
+                                     text-primary-700 dark:text-primary-400
+                                     text-xs rounded-full font-medium">
+                      {user?.role}
+                    </span>
                   </div>
+
+                  {/* Links */}
                   <div className="p-2">
                     <Link
                       to="/profile"
-                      className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
                       onClick={() => setShowUserMenu(false)}
+                      className="flex items-center gap-3 px-3 py-2
+                                 rounded-lg hover:bg-gray-100
+                                 dark:hover:bg-gray-700 transition-colors
+                                 text-sm text-gray-700 dark:text-gray-300"
                     >
                       <FiUser className="w-4 h-4" />
-                      <span>Profile</span>
+                      Profile
                     </Link>
                     <Link
                       to="/settings"
-                      className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
                       onClick={() => setShowUserMenu(false)}
+                      className="flex items-center gap-3 px-3 py-2
+                                 rounded-lg hover:bg-gray-100
+                                 dark:hover:bg-gray-700 transition-colors
+                                 text-sm text-gray-700 dark:text-gray-300"
                     >
                       <FiSettings className="w-4 h-4" />
-                      <span>Settings</span>
+                      Settings
                     </Link>
                   </div>
-                  <div className="p-2 border-t border-gray-200 dark:border-gray-700">
+
+                  {/* Logout */}
+                  <div className="p-2 border-t border-gray-200
+                                  dark:border-gray-700">
                     <button
-                      onClick={() => {
-                        setShowUserMenu(false)
-                        logout()
-                      }}
-                      className="flex items-center gap-3 px-3 py-2 w-full rounded-lg hover:bg-danger-50 dark:hover:bg-danger-900/20 text-danger-600 transition-colors"
+                      onClick={() => { setShowUserMenu(false); logout() }}
+                      className="flex items-center gap-3 px-3 py-2 w-full
+                                 rounded-lg hover:bg-red-50
+                                 dark:hover:bg-red-900/20 text-red-600
+                                 transition-colors text-sm"
                     >
                       <FiLogOut className="w-4 h-4" />
-                      <span>Logout</span>
+                      Logout
                     </button>
                   </div>
                 </motion.div>
@@ -244,13 +419,17 @@ const Navbar = ({ onMenuClick, isSidebarOpen }) => {
       {/* Mobile Search */}
       <div className="md:hidden px-4 pb-3">
         <div className="relative">
-          <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+          <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2
+                               w-5 h-5 text-gray-400" />
           <input
             type="text"
             placeholder="Search..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 bg-gray-100 dark:bg-gray-800 rounded-xl border-none focus:outline-none focus:ring-2 focus:ring-primary-500 text-gray-900 dark:text-white placeholder-gray-500"
+            className="w-full pl-10 pr-4 py-2 bg-gray-100 dark:bg-gray-800
+                       rounded-xl border-none focus:outline-none
+                       focus:ring-2 focus:ring-primary-500
+                       text-gray-900 dark:text-white placeholder-gray-500"
           />
         </div>
       </div>

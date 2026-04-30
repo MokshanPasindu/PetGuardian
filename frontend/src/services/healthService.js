@@ -2,117 +2,158 @@
 import api from './api'
 
 export const healthService = {
-  // Medical Records
+  // ==================== MEDICAL RECORDS ====================
+
   getMedicalRecords: async (petId) => {
     try {
-      const response = await api.get(`/medical/pet/${petId}/records`)
+      const response = await api.get(`/health/${petId}/history`)
       return response.data
     } catch (error) {
       console.error('Get Medical Records Error:', error)
-      throw new Error(error.response?.data?.message || 'Failed to get medical records')
+      throw new Error(
+        error.response?.data?.message || 'Failed to get medical records'
+      )
     }
   },
 
-  getMedicalRecordById: async (recordId) => {
+  getMedicalRecordsByType: async (petId, type) => {
     try {
-      const response = await api.get(`/medical/records/${recordId}`)
+      const response = await api.get(`/health/${petId}/history`, {
+        params: { type },
+      })
       return response.data
     } catch (error) {
-      console.error('Get Medical Record Error:', error)
-      throw new Error(error.response?.data?.message || 'Failed to get medical record')
+      console.error('Get Medical Records By Type Error:', error)
+      throw new Error(
+        error.response?.data?.message || 'Failed to get medical records'
+      )
+    }
+  },
+
+  getMedicalRecordById: async (petId, recordId) => {
+    try {
+      const response = await api.get(
+        `/health/${petId}/records/${recordId}`
+      )
+      return response.data
+    } catch (error) {
+      console.error('Get Medical Record By ID Error:', error)
+      throw new Error(
+        error.response?.data?.message || 'Failed to get medical record'
+      )
     }
   },
 
   createMedicalRecord: async (petId, recordData) => {
     try {
-      const response = await api.post(`/medical/pet/${petId}/records`, recordData)
+      const response = await api.post(`/health/${petId}/records`, recordData)
       return response.data
     } catch (error) {
       console.error('Create Medical Record Error:', error)
-      throw new Error(error.response?.data?.message || 'Failed to create medical record')
+      throw new Error(
+        error.response?.data?.message || 'Failed to create medical record'
+      )
     }
   },
 
-  updateMedicalRecord: async (recordId, recordData) => {
+  updateMedicalRecord: async (petId, recordId, recordData) => {
     try {
-      const response = await api.put(`/medical/records/${recordId}`, recordData)
+      const response = await api.put(
+        `/health/${petId}/records/${recordId}`,
+        recordData
+      )
       return response.data
     } catch (error) {
       console.error('Update Medical Record Error:', error)
-      throw new Error(error.response?.data?.message || 'Failed to update medical record')
+      throw new Error(
+        error.response?.data?.message || 'Failed to update medical record'
+      )
     }
   },
 
-  deleteMedicalRecord: async (recordId) => {
+  deleteMedicalRecord: async (petId, recordId) => {
     try {
-      const response = await api.delete(`/medical/records/${recordId}`)
+      const response = await api.delete(
+        `/health/${petId}/records/${recordId}`
+      )
       return response.data
     } catch (error) {
       console.error('Delete Medical Record Error:', error)
-      throw new Error(error.response?.data?.message || 'Failed to delete medical record')
+      throw new Error(
+        error.response?.data?.message || 'Failed to delete medical record'
+      )
     }
   },
 
-  // Vaccinations
+  // ==================== VACCINATIONS ====================
+
   getVaccinations: async (petId) => {
     try {
-      const response = await api.get(`/medical/pet/${petId}/vaccinations`)
+      const response = await api.get(`/health/${petId}/vaccinations`)
       return response.data
     } catch (error) {
       console.error('Get Vaccinations Error:', error)
-      throw new Error(error.response?.data?.message || 'Failed to get vaccinations')
+      throw new Error(
+        error.response?.data?.message || 'Failed to get vaccinations'
+      )
     }
   },
 
   createVaccination: async (petId, vaccinationData) => {
     try {
-      const response = await api.post(`/medical/pet/${petId}/vaccinations`, vaccinationData)
+      const response = await api.post(
+        `/health/${petId}/vaccinations`,
+        vaccinationData
+      )
       return response.data
     } catch (error) {
       console.error('Create Vaccination Error:', error)
-      throw new Error(error.response?.data?.message || 'Failed to create vaccination')
+      throw new Error(
+        error.response?.data?.message || 'Failed to create vaccination'
+      )
     }
   },
 
-  updateVaccination: async (vaccinationId, vaccinationData) => {
+  updateVaccination: async (petId, vaccinationId, vaccinationData) => {
     try {
-      const response = await api.put(`/medical/vaccinations/${vaccinationId}`, vaccinationData)
+      const response = await api.put(
+        `/health/${petId}/vaccinations/${vaccinationId}`,
+        vaccinationData
+      )
       return response.data
     } catch (error) {
       console.error('Update Vaccination Error:', error)
-      throw new Error(error.response?.data?.message || 'Failed to update vaccination')
+      throw new Error(
+        error.response?.data?.message || 'Failed to update vaccination'
+      )
     }
   },
 
-  deleteVaccination: async (vaccinationId) => {
+  deleteVaccination: async (petId, vaccinationId) => {
     try {
-      const response = await api.delete(`/medical/vaccinations/${vaccinationId}`)
+      const response = await api.delete(
+        `/health/${petId}/vaccinations/${vaccinationId}`
+      )
       return response.data
     } catch (error) {
       console.error('Delete Vaccination Error:', error)
-      throw new Error(error.response?.data?.message || 'Failed to delete vaccination')
+      throw new Error(
+        error.response?.data?.message || 'Failed to delete vaccination'
+      )
     }
   },
 
-  // Health Summary
+  // ==================== HEALTH SUMMARY ====================
+
   getHealthSummary: async (petId) => {
     try {
-      const response = await api.get(`/medical/pet/${petId}/summary`)
+      const response = await api.get(`/health/${petId}/summary`)
       return response.data
     } catch (error) {
       console.error('Get Health Summary Error:', error)
-      throw new Error(error.response?.data?.message || 'Failed to get health summary')
-    }
-  },
-
-  // Health Passport
-  getHealthPassport: async (petId) => {
-    try {
-      const response = await api.get(`/medical/pet/${petId}/passport`)
-      return response.data
-    } catch (error) {
-      console.error('Get Health Passport Error:', error)
-      throw new Error(error.response?.data?.message || 'Failed to get health passport')
+      throw new Error(
+        error.response?.data?.message || 'Failed to get health summary'
+      )
     }
   },
 }

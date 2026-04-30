@@ -1,60 +1,49 @@
-// src/services/aiService.js
-import { aiApi } from './api'
 import api from './api'
 
 export const aiService = {
-  // Analyze skin/health image
+
+  // POST /ai/analyze
+  // Sends image + petId to Spring Boot → Flask → CNN
   analyzeSkinImage: async (imageFile, petId) => {
     const formData = new FormData()
     formData.append('image', imageFile)
-    if (petId) {
-      formData.append('petId', petId)
-    }
-    
-    try {
-      const response = await aiApi.post('/analyze', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      })
-      return response.data
-    } catch (error) {
-      console.error('AI Analysis Error:', error)
-      throw new Error(error.response?.data?.message || 'Failed to analyze image')
-    }
+    formData.append('petId', petId)
+
+    const response = await api.post('/ai/analyze', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: 60000, // 60s for AI inference
+    })
+    return response.data
   },
 
-  // Get scan history for a specific pet
+  // GET /ai/scans/{petId}
   getScanHistory: async (petId) => {
-    try {
-      const response = await api.get(`/ai/scans/pet/${petId}`)
-      return response.data
-    } catch (error) {
-      console.error('Get Scan History Error:', error)
-      throw new Error(error.response?.data?.message || 'Failed to get scan history')
-    }
+    const response = await api.get(`/ai/scans/${petId}`)
+    return response.data
   },
 
-  // Get specific scan details
+  // GET /ai/scans/detail/{scanId}
   getScanById: async (scanId) => {
-    try {
-      const response = await api.get(`/ai/scans/${scanId}`)
-      return response.data
-    } catch (error) {
-      console.error('Get Scan Error:', error)
-      throw new Error(error.response?.data?.message || 'Failed to get scan details')
-    }
+    const response = await api.get(`/ai/scans/detail/${scanId}`)
+    return response.data
   },
 
-  // Get all scans for current user
+  // GET /ai/scans
   getAllUserScans: async () => {
-    try {
-      const response = await api.get('/ai/scans')
-      return response.data
-    } catch (error) {
-      console.error('Get All Scans Error:', error)
-      throw new Error(error.response?.data?.message || 'Failed to get scans')
-    }
+    const response = await api.get('/ai/scans')
+    return response.data
+  },
+
+  // POST /ai/scans/{scanId}/save-to-history
+  saveToMedicalHistory: async (scanId) => {
+    const response = await api.post(`/ai/scans/${scanId}/save-to-history`)
+    return response.data
+  },
+
+  // GET /ai/health
+  checkFlaskHealth: async () => {
+    const response = await api.get('/ai/health')
+    return response.data
   },
 }
 

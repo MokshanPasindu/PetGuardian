@@ -1,0 +1,22 @@
+{
+  "breed_labels": [
+    "Beagle",
+    "English Cocker Spaniel",
+    "Maine Coon",
+    "Persian",
+    "Siamese",
+    "Pug"
+  ],
+  "category_labels": [
+    "Cat",
+    "Dog"
+  ],
+  "breed_to_category": {
+    "Beagle": "Dog",
+    "English Cocker Spaniel": "Dog",
+    "Maine Coon": "Cat",
+    "Persian": "Cat",
+    "Pug": "Dog",
+    "Siamese": "Cat"
+  }
+}

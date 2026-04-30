@@ -1,249 +1,392 @@
 // src/pages/health/MedicalHistory.jsx
-import { useState, useEffect } from 'react'
-import { useParams, Link } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { useParams, Link, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
   FiArrowLeft,
   FiPlus,
   FiFilter,
   FiFileText,
+  FiTrash2,
+  FiEdit,
   FiCalendar,
   FiUser,
-  FiCamera,
+  FiSearch,
 } from 'react-icons/fi'
-import { healthService } from '../../services/healthService'
+import { usePets } from '../../hooks/usePets'
+import { useHealth } from '../../hooks/useHealth'
 import Card from '../../components/common/Card'
 import Button from '../../components/common/Button'
 import Badge from '../../components/common/Badge'
-import { LoadingPage } from '../../components/common/LoadingSpinner'
+import Select from '../../components/common/Select'
+import Modal from '../../components/common/Modal'
 import EmptyState from '../../components/common/EmptyState'
+import LoadingSpinner from '../../components/common/LoadingSpinner'
 import { formatDate } from '../../utils/helpers'
+
+const RECORD_TYPE_OPTIONS = [
+  { value: '', label: 'All Types' },
+  { value: 'CHECKUP', label: 'Checkup' },
+  { value: 'VACCINATION', label: 'Vaccination' },
+  { value: 'TREATMENT', label: 'Treatment' },
+  { value: 'SURGERY', label: 'Surgery' },
+  { value: 'MEDICATION', label: 'Medication' },
+  { value: 'AI_SCAN', label: 'AI Scan' },
+  { value: 'OTHER', label: 'Other' },
+]
+
+const RECORD_TYPE_COLORS = {
+  CHECKUP: 'bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400',
+  VACCINATION:
+    'bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400',
+  TREATMENT:
+    'bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400',
+  SURGERY: 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400',
+  MEDICATION:
+    'bg-yellow-100 text-yellow-600 dark:bg-yellow-900/30 dark:text-yellow-400',
+  AI_SCAN:
+    'bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400',
+  OTHER: 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400',
+}
 
 const MedicalHistory = () => {
   const { petId } = useParams()
-  const [records, setRecords] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [filter, setFilter] = useState('all')
+  const navigate = useNavigate()
+  const { selectedPet: pet, getPetById } = usePets()
+  const {
+    medicalRecords,
+    fetchMedicalRecords,
+    deleteMedicalRecord,
+    recordsLoading,
+    loading,
+  } = useHealth()
+
+  const [filterType, setFilterType] = useState('')
+  const [searchQuery, setSearchQuery] = useState('')
+  const [deleteModal, setDeleteModal] = useState({
+    open: false,
+    recordId: null,
+    title: '',
+  })
+  const [viewRecord, setViewRecord] = useState(null)
 
   useEffect(() => {
-    const fetchRecords = async () => {
-      try {
-        // Mock data
-        setRecords([
-          {
-            id: 1,
-            type: 'checkup',
-            title: 'Annual Checkup',
-            description: 'Routine annual health examination. All vitals normal.',
-            date: '2024-01-15',
-            vet: 'Dr. Sarah Smith',
-            clinic: 'City Animal Hospital',
-            notes: 'Weight stable, coat healthy, no concerns.',
-          },
-          {
-            id: 2,
-            type: 'vaccination',
-            title: 'Rabies Vaccination',
-            description: 'Annual rabies vaccine administered.',
-            date: '2023-12-01',
-            vet: 'Dr. Mike Johnson',
-            clinic: 'Pet Care Plus',
-            notes: 'Next due: December 2024',
-          },
-          {
-            id: 3,
-            type: 'ai_scan',
-            title: 'AI Skin Analysis',
-            description: 'AI-powered skin condition screening.',
-            date: '2023-11-20',
-            result: 'No issues detected',
-            severity: 'mild',
-            confidence: 0.95,
-          },
-          {
-            id: 4,
-            type: 'treatment',
-            title: 'Dental Cleaning',
-            description: 'Professional dental cleaning and examination.',
-            date: '2023-10-15',
-            vet: 'Dr. Sarah Smith',
-            clinic: 'City Animal Hospital',
-            notes: 'Mild tartar buildup removed. Recommend dental treats.',
-          },
-        ])
-      } catch (error) {
-        console.error('Failed to fetch records:', error)
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    fetchRecords()
+    getPetById(petId)
+    fetchMedicalRecords(petId)
   }, [petId])
 
-  const getRecordIcon = (type) => {
-    switch (type) {
-      case 'checkup':
-        return <FiUser className="w-5 h-5" />
-      case 'vaccination':
-        return <FiCalendar className="w-5 h-5" />
-      case 'ai_scan':
-        return <FiCamera className="w-5 h-5" />
-      default:
-        return <FiFileText className="w-5 h-5" />
+  const handleFilter = async (type) => {
+    setFilterType(type)
+    await fetchMedicalRecords(petId, type || null)
+  }
+
+  const handleDelete = async () => {
+    try {
+      await deleteMedicalRecord(petId, deleteModal.recordId)
+      setDeleteModal({ open: false, recordId: null, title: '' })
+    } catch (error) {
+      // handled in context
     }
   }
 
-  const getRecordColor = (type) => {
-    switch (type) {
-      case 'checkup':
-        return 'bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400'
-      case 'vaccination':
-        return 'bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400'
-      case 'ai_scan':
-        return 'bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400'
-      case 'treatment':
-        return 'bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400'
-      default:
-        return 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400'
-    }
-  }
-
-  const filteredRecords = filter === 'all' 
-    ? records 
-    : records.filter((r) => r.type === filter)
-
-  if (loading) {
-    return <LoadingPage message="Loading medical history..." />
-  }
+  const filteredRecords = medicalRecords.filter(
+    (r) =>
+      r.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      r.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      r.vetName?.toLowerCase().includes(searchQuery.toLowerCase())
+  )
 
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="flex items-center gap-4">
-          <Link to={`/health/${petId}`}>
-            <Button variant="ghost" icon={FiArrowLeft}>
-              Back
-            </Button>
-          </Link>
+      <div className="flex items-center justify-between flex-wrap gap-4">
+        <div className="flex items-center gap-3">
+          <Button
+            variant="ghost"
+            icon={FiArrowLeft}
+            onClick={() => navigate(`/health/${petId}`)}
+          >
+            Back
+          </Button>
           <div>
             <h1 className="text-2xl font-display font-bold text-gray-900 dark:text-white">
               Medical History
             </h1>
-            <p className="text-gray-600 dark:text-gray-400">
-              Complete health records timeline
-            </p>
+            {pet && (
+              <p className="text-gray-500 dark:text-gray-400 text-sm">
+                {pet.name}'s health records
+              </p>
+            )}
           </div>
         </div>
-        <Link to={`/health/${petId}/add-record`}>
+        <Link to={`/health/${petId}/records/add`}>
           <Button icon={FiPlus}>Add Record</Button>
         </Link>
       </div>
 
       {/* Filters */}
-      <div className="flex gap-2 flex-wrap">
-        {[
-          { value: 'all', label: 'All' },
-          { value: 'checkup', label: 'Checkups' },
-          { value: 'vaccination', label: 'Vaccinations' },
-          { value: 'ai_scan', label: 'AI Scans' },
-          { value: 'treatment', label: 'Treatments' },
-        ].map((f) => (
-          <Button
-            key={f.value}
-            variant={filter === f.value ? 'primary' : 'secondary'}
-            size="sm"
-            onClick={() => setFilter(f.value)}
-          >
-            {f.label}
-          </Button>
-        ))}
-      </div>
+      <Card>
+        <div className="flex flex-col sm:flex-row gap-4">
+          {/* Search */}
+          <div className="relative flex-1">
+            <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Search records..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="input-field pl-10"
+            />
+          </div>
+          {/* Type Filter */}
+          <div className="w-full sm:w-48">
+            <Select
+              options={RECORD_TYPE_OPTIONS}
+              value={filterType}
+              onChange={handleFilter}
+              placeholder="Filter by type"
+            />
+          </div>
+        </div>
+      </Card>
 
-      {/* Timeline */}
-      {filteredRecords.length > 0 ? (
-        <div className="relative">
-          {/* Timeline line */}
-          <div className="absolute left-6 top-0 bottom-0 w-0.5 bg-gray-200 dark:bg-gray-700" />
+      {/* Records Count */}
+      {!recordsLoading && (
+        <p className="text-sm text-gray-500 dark:text-gray-400">
+          {filteredRecords.length} record
+          {filteredRecords.length !== 1 ? 's' : ''} found
+        </p>
+      )}
 
-          <div className="space-y-6">
-            {filteredRecords.map((record, index) => (
-              <motion.div
-                key={record.id}
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: index * 0.1 }}
-                className="relative pl-14"
-              >
-                {/* Timeline dot */}
-                <div
-                  className={`absolute left-4 w-5 h-5 rounded-full ${getRecordColor(record.type)} flex items-center justify-center`}
-                >
-                  <div className="w-2 h-2 rounded-full bg-current" />
-                </div>
+      {/* Records List */}
+      {recordsLoading ? (
+        <div className="flex justify-center py-12">
+          <LoadingSpinner size="lg" />
+        </div>
+      ) : filteredRecords.length > 0 ? (
+        <div className="space-y-4">
+          {filteredRecords.map((record, index) => (
+            <motion.div
+              key={record.id}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: index * 0.05 }}
+            >
+              <Card className="hover:shadow-medium transition-shadow">
+                <div className="flex items-start gap-4">
+                  {/* Type Icon */}
+                  <div
+                    className={`p-3 rounded-xl flex-shrink-0 ${
+                      RECORD_TYPE_COLORS[record.type] ||
+                      RECORD_TYPE_COLORS.OTHER
+                    }`}
+                  >
+                    <FiFileText className="w-5 h-5" />
+                  </div>
 
-                <Card>
-                  <div className="flex items-start gap-4">
-                    <div className={`p-3 rounded-xl ${getRecordColor(record.type)}`}>
-                      {getRecordIcon(record.type)}
+                  {/* Content */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-start justify-between gap-2 mb-2">
+                      <h3 className="font-semibold text-gray-900 dark:text-white">
+                        {record.title}
+                      </h3>
+                      <Badge variant="info" size="sm" className="flex-shrink-0 capitalize">
+                        {record.type?.toLowerCase().replace('_', ' ')}
+                      </Badge>
                     </div>
-                    <div className="flex-1">
-                      <div className="flex items-start justify-between mb-2">
-                        <div>
-                          <h3 className="font-semibold text-gray-900 dark:text-white">
-                            {record.title}
-                          </h3>
-                          <p className="text-sm text-gray-500 dark:text-gray-400">
-                            {formatDate(record.date)}
-                            {record.vet && ` • ${record.vet}`}
-                          </p>
-                        </div>
-                        <Badge variant="info" className="capitalize">
-                          {record.type.replace('_', ' ')}
-                        </Badge>
-                      </div>
-                      <p className="text-gray-600 dark:text-gray-400 mb-2">
+
+                    <div className="flex flex-wrap items-center gap-3 text-sm text-gray-500 dark:text-gray-400 mb-2">
+                      <span className="flex items-center gap-1">
+                        <FiCalendar className="w-4 h-4" />
+                        {formatDate(record.date)}
+                      </span>
+                      {record.vetName && (
+                        <span className="flex items-center gap-1">
+                          <FiUser className="w-4 h-4" />
+                          Dr. {record.vetName}
+                        </span>
+                      )}
+                      {record.clinicName && (
+                        <span className="text-gray-400">
+                          {record.clinicName}
+                        </span>
+                      )}
+                    </div>
+
+                    {record.description && (
+                      <p className="text-gray-600 dark:text-gray-400 text-sm line-clamp-2">
                         {record.description}
                       </p>
-                      {record.notes && (
-                        <p className="text-sm text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-700/50 rounded-lg p-3">
-                          <strong>Notes:</strong> {record.notes}
+                    )}
+
+                    {record.prescription && (
+                      <div className="mt-2 px-3 py-2 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                        <p className="text-xs text-blue-700 dark:text-blue-400">
+                          💊 Prescription: {record.prescription}
                         </p>
-                      )}
-                      {record.severity && (
-                        <div className="mt-2">
-                          <Badge
-                            variant={
-                              record.severity === 'mild'
-                                ? 'success'
-                                : record.severity === 'moderate'
-                                ? 'warning'
-                                : 'danger'
-                            }
-                          >
-                            {record.severity} - {(record.confidence * 100).toFixed(0)}% confidence
-                          </Badge>
-                        </div>
-                      )}
-                    </div>
+                      </div>
+                    )}
                   </div>
-                </Card>
-              </motion.div>
-            ))}
-          </div>
+
+
+                  {/* Actions */}
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    {/* View Button */}
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      icon={FiFileText}
+                      onClick={() => setViewRecord(record)}
+                    >
+                      View
+                    </Button>
+
+                    {/* ✅ Edit Button - correct path */}
+                    <Link to={`/health/${petId}/records/${record.id}/edit`}>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        icon={FiEdit}
+                      />
+                    </Link>
+
+                    {/* Delete Button */}
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      icon={FiTrash2}
+                      onClick={() =>
+                        setDeleteModal({
+                          open: true,
+                          recordId: record.id,
+                          title: record.title,
+                        })
+                      }
+                      className="text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20"
+                    />
+                  </div>
+                </div>
+              </Card>
+            </motion.div>
+          ))}
         </div>
       ) : (
         <Card>
           <EmptyState
             icon={FiFileText}
-            title="No records found"
-            description="Start building your pet's medical history"
-            action={() => (window.location.href = `/health/${petId}/add-record`)}
+            title="No medical records"
+            description={
+              searchQuery || filterType
+                ? 'No records match your search. Try different filters.'
+                : "No medical records yet. Add your first record to start tracking your pet's health."
+            }
+            action={
+              !searchQuery && !filterType
+                ? () => navigate(`/health/${petId}/records/add`)
+                : undefined
+            }
             actionLabel="Add First Record"
           />
         </Card>
       )}
+
+      {/* View Record Modal */}
+      <Modal
+        isOpen={!!viewRecord}
+        onClose={() => setViewRecord(null)}
+        title={viewRecord?.title}
+        size="lg"
+      >
+        {viewRecord && (
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <p className="text-sm text-gray-500">Date</p>
+                <p className="font-medium">{formatDate(viewRecord.date)}</p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-500">Type</p>
+                <Badge variant="info" className="capitalize mt-1">
+                  {viewRecord.type?.toLowerCase().replace('_', ' ')}
+                </Badge>
+              </div>
+              {viewRecord.vetName && (
+                <div>
+                  <p className="text-sm text-gray-500">Veterinarian</p>
+                  <p className="font-medium">Dr. {viewRecord.vetName}</p>
+                </div>
+              )}
+              {viewRecord.clinicName && (
+                <div>
+                  <p className="text-sm text-gray-500">Clinic</p>
+                  <p className="font-medium">{viewRecord.clinicName}</p>
+                </div>
+              )}
+            </div>
+            {viewRecord.description && (
+              <div>
+                <p className="text-sm text-gray-500 mb-1">Description</p>
+                <p className="text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-700 p-3 rounded-xl">
+                  {viewRecord.description}
+                </p>
+              </div>
+            )}
+            {viewRecord.notes && (
+              <div>
+                <p className="text-sm text-gray-500 mb-1">Notes</p>
+                <p className="text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-700 p-3 rounded-xl">
+                  {viewRecord.notes}
+                </p>
+              </div>
+            )}
+            {viewRecord.prescription && (
+              <div>
+                <p className="text-sm text-gray-500 mb-1">Prescription</p>
+                <p className="text-gray-700 dark:text-gray-300 bg-blue-50 dark:bg-blue-900/20 p-3 rounded-xl">
+                  💊 {viewRecord.prescription}
+                </p>
+              </div>
+            )}
+            <div className="flex justify-end gap-2 pt-2 border-t border-gray-100 dark:border-gray-700">
+              <Link to={`/health/${petId}/records/${viewRecord.id}/edit`}>
+                <Button variant="secondary" icon={FiEdit}>
+                  Edit Record
+                </Button>
+              </Link>
+              <Button onClick={() => setViewRecord(null)}>Close</Button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* Delete Confirmation Modal */}
+      <Modal
+        isOpen={deleteModal.open}
+        onClose={() =>
+          setDeleteModal({ open: false, recordId: null, title: '' })
+        }
+        title="Delete Medical Record"
+        description={`Are you sure you want to delete "${deleteModal.title}"? This cannot be undone.`}
+      >
+        <div className="flex justify-end gap-3 mt-6">
+          <Button
+            variant="secondary"
+            onClick={() =>
+              setDeleteModal({ open: false, recordId: null, title: '' })
+            }
+          >
+            Cancel
+          </Button>
+          <Button
+            variant="danger"
+            onClick={handleDelete}
+            loading={loading}
+            icon={FiTrash2}
+          >
+            Delete Record
+          </Button>
+        </div>
+      </Modal>
     </div>
   )
 }

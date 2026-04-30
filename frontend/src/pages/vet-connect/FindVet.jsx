@@ -1,213 +1,504 @@
 // src/pages/vet-connect/FindVet.jsx
-import { useState, useEffect } from 'react'
-import { motion } from 'framer-motion'
-import { FiMapPin, FiSearch, FiFilter, FiList, FiMap, FiNavigation } from 'react-icons/fi'
+import { useState, useEffect, useCallback, lazy, Suspense } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
+import {
+  FiMapPin,
+  FiSearch,
+  FiList,
+  FiMap,
+  FiNavigation,
+  FiAlertTriangle,
+  FiRefreshCw,
+  FiX,
+  FiFilter,
+} from 'react-icons/fi'
 import { useGeolocation } from '../../hooks/useGeolocation'
 import { vetService } from '../../services/vetService'
 import Card from '../../components/common/Card'
 import Button from '../../components/common/Button'
-import Input from '../../components/common/Input'
-import Badge from '../../components/common/Badge'
+import Select from '../../components/common/Select'
 import VetCard from '../../components/vet/VetCard'
-import { LoadingPage } from '../../components/common/LoadingSpinner'
-import Alert from '../../components/common/Alert'
+import EmptyState from '../../components/common/EmptyState'
+import LoadingSpinner from '../../components/common/LoadingSpinner'
+
+// ✅ Lazy load map so it never crashes the page
+const VetMap = lazy(() => import('../../components/vet/VetMap'))
+
+const RADIUS_OPTIONS = [
+  { value: '5', label: '5 km' },
+  { value: '10', label: '10 km' },
+  { value: '20', label: '20 km' },
+  { value: '50', label: '50 km' },
+]
+
+const SORT_OPTIONS = [
+  { value: 'distance', label: 'Sort: Distance' },
+  { value: 'rating', label: 'Sort: Rating' },
+  { value: 'name', label: 'Sort: Name' },
+]
 
 const FindVet = () => {
-  const { location, loading: locationLoading, error: locationError } = useGeolocation()
+  const {
+    location,
+    loading: locationLoading,
+    error: locationError,
+    refresh: refreshLocation,
+  } = useGeolocation()
+
   const [vets, setVets] = useState([])
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(false)
+  const [hasFetched, setHasFetched] = useState(false)
   const [viewMode, setViewMode] = useState('list')
   const [searchQuery, setSearchQuery] = useState('')
+  const [selectedVet, setSelectedVet] = useState(null)
+  const [sortBy, setSortBy] = useState('distance')
+  const [showFilters, setShowFilters] = useState(false)
   const [filters, setFilters] = useState({
     emergency: false,
     openNow: false,
-    radius: 10,
+    radius: '10',
   })
 
-  useEffect(() => {
-    const fetchVets = async () => {
-      try {
-        // Mock data for demo
-        setVets([
-          {
-            id: 1,
-            name: 'City Animal Hospital',
-            specialization: 'General Practice, Surgery',
-            address: '123 Main Street, Downtown',
-            phone: '+1 (555) 123-4567',
-            hours: '8:00 AM - 8:00 PM',
-            rating: 4.8,
-            reviewCount: 234,
-            isOpen: true,
-            emergency: true,
-            distance: 1200,
-            lat: 40.7128,
-            lng: -74.0060,
-            image: 'https://images.unsplash.com/photo-1629909613654-28e377c37b09?w=400&h=200&fit=crop',
-          },
-          {
-            id: 2,
-            name: 'Pet Care Plus',
-            specialization: 'Dermatology, Internal Medicine',
-            address: '456 Oak Avenue, Midtown',
-            phone: '+1 (555) 234-5678',
-            hours: '9:00 AM - 6:00 PM',
-            rating: 4.6,
-            reviewCount: 187,
-            isOpen: true,
-            emergency: false,
-            distance: 2500,
-            lat: 40.7580,
-            lng: -73.9855,
-            image: 'https://images.unsplash.com/photo-1628009368231-7bb7cf24da27?w=400&h=200&fit=crop',
-          },
-          {
-            id: 3,
-            name: 'Emergency Vet Clinic',
-            specialization: 'Emergency Care, Critical Care',
-            address: '789 Emergency Lane, Uptown',
-            phone: '+1 (555) 345-6789',
-            hours: '24/7',
-            rating: 4.9,
-            reviewCount: 412,
-            isOpen: true,
-            emergency: true,
-            distance: 3800,
-            lat: 40.7831,
-            lng: -73.9712,
-            image: 'https://images.unsplash.com/photo-1612531386530-97286d97c2d2?w=400&h=200&fit=crop',
-          },
-        ])
-      } catch (error) {
-        console.error('Failed to fetch vets:', error)
-      } finally {
-        setLoading(false)
+  // ── Fetch vets ─────────────────────────────────────────────────
+  // ✅ KEY FIX: fetch vets independently of location
+  // location is OPTIONAL - we fall back to all vets if no GPS
+  const fetchVets = useCallback(async (userLocation = null) => {
+    setLoading(true)
+    try {
+      let data = []
+
+      if (userLocation) {
+        // Try nearby search with GPS coords
+        try {
+          data = await vetService.getNearbyVets(
+            userLocation.lat,
+            userLocation.lng,
+            Number(filters.radius)
+          )
+        } catch {
+          data = []
+        }
       }
+
+      // ✅ Always fall back to all vets if nearby fails or no location
+      if (!data || data.length === 0) {
+        data = await vetService.getAllVets()
+      }
+
+      setVets(Array.isArray(data) ? data : [])
+    } catch (error) {
+      console.error('Fetch vets failed:', error)
+      setVets([])
+    } finally {
+      setLoading(false)
+      setHasFetched(true)
     }
+  }, [filters.radius])
 
-    fetchVets()
-  }, [location])
+  // ✅ KEY FIX: Fetch immediately on mount, don't wait for location
+  useEffect(() => {
+    if (!hasFetched) {
+      fetchVets(null) // Fetch all vets immediately
+    }
+  }, []) // eslint-disable-line
 
+  // ✅ When location resolves, refetch with coords for better results
+  useEffect(() => {
+    if (location && hasFetched) {
+      fetchVets(location)
+    }
+  }, [location]) // eslint-disable-line
+
+  // ── Directions ─────────────────────────────────────────────────
   const handleGetDirections = (vet) => {
-    const url = `https://www.google.com/maps/dir/?api=1&destination=${vet.lat},${vet.lng}`
-    window.open(url, '_blank')
+    const dest =
+      vet.latitude && vet.longitude
+        ? `${vet.latitude},${vet.longitude}`
+        : encodeURIComponent(vet.address || '')
+    window.open(
+      `https://www.google.com/maps/dir/?api=1&destination=${dest}`,
+      '_blank'
+    )
   }
 
-  const filteredVets = vets.filter((vet) => {
-    if (filters.emergency && !vet.emergency) return false
-    if (filters.openNow && !vet.isOpen) return false
-    if (searchQuery && !vet.name.toLowerCase().includes(searchQuery.toLowerCase())) return false
-    return true
-  })
+  // ── Filter + Sort ───────────────────────────────────────────────
+  const filtered = vets
+    .filter((v) => {
+      if (filters.emergency && !v.isEmergency) return false
+      if (filters.openNow && !v.isOpen) return false
+      if (searchQuery) {
+        const q = searchQuery.toLowerCase()
+        return (
+          v.name?.toLowerCase().includes(q) ||
+          v.specialization?.toLowerCase().includes(q) ||
+          v.address?.toLowerCase().includes(q)
+        )
+      }
+      return true
+    })
+    .sort((a, b) => {
+      if (sortBy === 'distance') {
+        if (a.distance == null) return 1
+        if (b.distance == null) return -1
+        return a.distance - b.distance
+      }
+      if (sortBy === 'rating') return (b.rating || 0) - (a.rating || 0)
+      if (sortBy === 'name') return a.name?.localeCompare(b.name)
+      return 0
+    })
 
-  if (loading) {
-    return <LoadingPage message="Finding nearby veterinary clinics..." />
-  }
+  const emergencyCount = vets.filter((v) => v.isEmergency).length
+  const openCount = vets.filter((v) => v.isOpen).length
+  const hasActiveFilters =
+    filters.emergency || filters.openNow || !!searchQuery
 
+  // ✅ Show loading ONLY for the data fetch, NOT waiting for GPS
   return (
     <div className="space-y-6">
-      {/* Header */}
+
+      {/* ── Header ─────────────────────────────────────────────── */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="bg-gradient-to-r from-purple-500 to-primary-500 rounded-2xl p-6 md:p-8 text-white"
+        className="relative overflow-hidden bg-gradient-to-r from-purple-500 to-primary-600 rounded-2xl p-6 md:p-8 text-white"
       >
-        <div className="flex items-center gap-3 mb-4">
-          <div className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center">
-            <FiMapPin className="w-6 h-6" />
+        <div className="absolute top-0 right-0 w-48 h-48 bg-white/5 rounded-full -translate-y-1/2 translate-x-1/2" />
+
+        <div className="relative flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <div className="w-14 h-14 rounded-2xl bg-white/20 flex items-center justify-center flex-shrink-0">
+              <FiMapPin className="w-7 h-7" />
+            </div>
+            <div>
+              <h1 className="text-2xl md:text-3xl font-display font-bold">
+                Vet Connect
+              </h1>
+              <p className="text-white/80 text-sm mt-0.5">
+                {loading
+                  ? 'Searching for clinics...'
+                  : `${vets.length} clinic${vets.length !== 1 ? 's' : ''} available`}
+              </p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-2xl font-display font-bold">Vet Connect</h1>
-            <p className="text-white/80">Find nearby veterinary clinics</p>
+
+          <div className="flex flex-col gap-2 items-start md:items-end">
+            {/* Location status pill */}
+            {locationLoading ? (
+              <div className="flex items-center gap-2 px-3 py-1.5 bg-white/10 rounded-xl text-xs">
+                <div className="w-3 h-3 border border-white/50 border-t-white rounded-full animate-spin" />
+                <span className="text-white/80">Getting your location...</span>
+              </div>
+            ) : locationError ? (
+              <div className="flex items-center gap-2 px-3 py-1.5 bg-yellow-500/20 rounded-xl text-xs">
+                <FiAlertTriangle className="w-3 h-3 text-yellow-300 flex-shrink-0" />
+                <span className="text-yellow-100">
+                  Showing all clinics
+                </span>
+                <button
+                  onClick={refreshLocation}
+                  className="p-0.5 hover:bg-white/10 rounded"
+                  title="Retry location"
+                >
+                  <FiRefreshCw className="w-3 h-3" />
+                </button>
+              </div>
+            ) : location ? (
+              <div className="flex items-center gap-2 px-3 py-1.5 bg-green-500/20 rounded-xl text-xs">
+                <FiNavigation className="w-3 h-3 text-green-300" />
+                <span className="text-green-100">
+                  Sorted by distance from you
+                </span>
+              </div>
+            ) : null}
+
+            {/* Stats pills */}
+            <div className="flex gap-2">
+              <span className="px-3 py-1 bg-white/10 rounded-lg text-xs">
+                <span className="font-semibold">{emergencyCount}</span>
+                <span className="text-white/70 ml-1">Emergency</span>
+              </span>
+              <span className="px-3 py-1 bg-white/10 rounded-lg text-xs">
+                <span className="font-semibold">{openCount}</span>
+                <span className="text-white/70 ml-1">Open Now</span>
+              </span>
+            </div>
           </div>
         </div>
-
-        {locationError ? (
-          <Alert variant="warning" className="bg-white/10 border-white/20">
-            Location access denied. Showing all available clinics.
-          </Alert>
-        ) : location ? (
-          <p className="text-white/80 flex items-center gap-2">
-            <FiNavigation className="w-4 h-4" />
-            Showing clinics near your location
-          </p>
-        ) : null}
       </motion.div>
 
-      {/* Search & Filters */}
-      <div className="flex flex-col md:flex-row gap-4">
-        <div className="flex-1 relative">
+      {/* ── Search + Controls ───────────────────────────────────── */}
+      <div className="flex flex-col sm:flex-row gap-3">
+        {/* Search */}
+        <div className="relative flex-1">
           <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
           <input
             type="text"
-            placeholder="Search veterinary clinics..."
+            placeholder="Search clinics, specializations, address..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="input-field pl-10"
+            className="input-field pl-10 w-full"
           />
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery('')}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+            >
+              <FiX className="w-4 h-4" />
+            </button>
+          )}
         </div>
-        <div className="flex gap-2">
-          <Button
-            variant={filters.emergency ? 'danger' : 'secondary'}
-            onClick={() => setFilters({ ...filters, emergency: !filters.emergency })}
+
+        {/* Filter toggle */}
+        <Button
+          variant={showFilters ? 'primary' : 'secondary'}
+          icon={FiFilter}
+          onClick={() => setShowFilters((v) => !v)}
+        >
+          Filters
+          {hasActiveFilters && (
+            <span className="ml-1 w-2 h-2 bg-red-400 rounded-full inline-block" />
+          )}
+        </Button>
+
+        {/* View toggle */}
+        <div className="flex rounded-xl overflow-hidden border border-gray-200 dark:border-gray-700">
+          <button
+            onClick={() => setViewMode('list')}
+            title="List View"
+            className={`px-4 py-2 transition-colors ${
+              viewMode === 'list'
+                ? 'bg-primary-500 text-white'
+                : 'hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-600 dark:text-gray-400'
+            }`}
           >
-            24/7 Emergency
-          </Button>
-          <Button
-            variant={filters.openNow ? 'primary' : 'secondary'}
-            onClick={() => setFilters({ ...filters, openNow: !filters.openNow })}
+            <FiList className="w-5 h-5" />
+          </button>
+          <button
+            onClick={() => setViewMode('map')}
+            title="Map View"
+            className={`px-4 py-2 transition-colors ${
+              viewMode === 'map'
+                ? 'bg-primary-500 text-white'
+                : 'hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-600 dark:text-gray-400'
+            }`}
           >
-            Open Now
-          </Button>
-          <div className="flex border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden">
-            <button
-              className={`p-3 ${viewMode === 'list' ? 'bg-primary-500 text-white' : 'hover:bg-gray-100 dark:hover:bg-gray-800'}`}
-              onClick={() => setViewMode('list')}
-            >
-              <FiList className="w-5 h-5" />
-            </button>
-            <button
-              className={`p-3 ${viewMode === 'map' ? 'bg-primary-500 text-white' : 'hover:bg-gray-100 dark:hover:bg-gray-800'}`}
-              onClick={() => setViewMode('map')}
-            >
-              <FiMap className="w-5 h-5" />
-            </button>
-          </div>
+            <FiMap className="w-5 h-5" />
+          </button>
         </div>
       </div>
 
-      {/* Results */}
+      {/* ── Filter Panel ────────────────────────────────────────── */}
+      <AnimatePresence>
+        {showFilters && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            className="overflow-hidden"
+          >
+            <Card>
+              <div className="flex flex-wrap gap-4 items-end">
+                <div>
+                  <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">
+                    Availability
+                  </p>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() =>
+                        setFilters((f) => ({
+                          ...f,
+                          emergency: !f.emergency,
+                        }))
+                      }
+                      className={`px-3 py-1.5 rounded-xl text-sm font-medium transition-colors ${
+                        filters.emergency
+                          ? 'bg-red-500 text-white'
+                          : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300'
+                      }`}
+                    >
+                      🚨 24/7 Emergency
+                    </button>
+                    <button
+                      onClick={() =>
+                        setFilters((f) => ({
+                          ...f,
+                          openNow: !f.openNow,
+                        }))
+                      }
+                      className={`px-3 py-1.5 rounded-xl text-sm font-medium transition-colors ${
+                        filters.openNow
+                          ? 'bg-green-500 text-white'
+                          : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300'
+                      }`}
+                    >
+                      ✅ Open Now
+                    </button>
+                  </div>
+                </div>
+
+                <div className="w-32">
+                  <Select
+                    label="Radius"
+                    options={RADIUS_OPTIONS}
+                    value={filters.radius}
+                    onChange={(v) =>
+                      setFilters((f) => ({ ...f, radius: v }))
+                    }
+                  />
+                </div>
+
+                <div className="w-44">
+                  <Select
+                    label="Sort By"
+                    options={SORT_OPTIONS}
+                    value={sortBy}
+                    onChange={setSortBy}
+                  />
+                </div>
+
+                {hasActiveFilters && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      setFilters({
+                        emergency: false,
+                        openNow: false,
+                        radius: '10',
+                      })
+                      setSearchQuery('')
+                    }}
+                  >
+                    Clear All
+                  </Button>
+                )}
+              </div>
+            </Card>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+
+      {/* ── Results Bar ─────────────────────────────────────────── */}
       <div className="flex items-center justify-between">
-        <p className="text-gray-600 dark:text-gray-400">
-          {filteredVets.length} clinics found
-        </p>
-        <select className="input-field w-auto">
-          <option>Sort by: Distance</option>
-          <option>Sort by: Rating</option>
-          <option>Sort by: Name</option>
-        </select>
+
+        {/* ✅ CHANGED: <p> → <div> to fix DOM nesting warning */}
+        <div className="text-sm text-gray-600 dark:text-gray-400">
+          {loading ? (
+            <span className="flex items-center gap-2">
+              <LoadingSpinner size="sm" />
+              <span>Searching clinics...</span>
+            </span>
+          ) : (
+            <>
+              <span className="font-semibold text-gray-900 dark:text-white">
+                {filtered.length}
+              </span>{' '}
+              clinic{filtered.length !== 1 ? 's' : ''}
+              {location && (
+                <span className="text-gray-400 ml-1">
+                  sorted by distance
+                </span>
+              )}
+              {searchQuery && (
+                <span className="ml-1">
+                  for{' '}
+                  <span className="font-medium text-primary-600
+                                   dark:text-primary-400">
+                    "{searchQuery}"
+                  </span>
+                </span>
+              )}
+            </>
+          )}
+        </div>
+
+        <Button
+          variant="ghost"
+          size="sm"
+          icon={FiRefreshCw}
+          onClick={() => fetchVets(location)}
+          disabled={loading}
+        >
+          Refresh
+        </Button>
       </div>
 
-      {viewMode === 'list' ? (
+      {/* ── Content ─────────────────────────────────────────────── */}
+      {loading && vets.length === 0 ? (
+        /* Initial loading state */
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredVets.map((vet, index) => (
+          {[1, 2, 3, 4, 5, 6].map((i) => (
+            <div
+              key={i}
+              className="bg-gray-200 dark:bg-gray-700 rounded-2xl h-72 animate-pulse"
+            />
+          ))}
+        </div>
+      ) : viewMode === 'map' ? (
+        /* Map View */
+        <Suspense
+          fallback={
+            <div className="h-[500px] rounded-2xl bg-gray-100 dark:bg-gray-800 flex flex-col items-center justify-center gap-3">
+              <LoadingSpinner size="lg" />
+              <p className="text-gray-500 text-sm">Loading map...</p>
+            </div>
+          }
+        >
+          <VetMap
+            vets={filtered}
+            userLocation={location}
+            selectedVet={selectedVet}
+            onVetSelect={setSelectedVet}
+            onGetDirections={handleGetDirections}
+          />
+        </Suspense>
+      ) : filtered.length > 0 ? (
+        /* List View */
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="grid md:grid-cols-2 lg:grid-cols-3 gap-6"
+        >
+          {filtered.map((vet, index) => (
             <motion.div
               key={vet.id}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: index * 0.1 }}
+              transition={{ delay: index * 0.07 }}
             >
-              <VetCard vet={vet} onGetDirections={handleGetDirections} />
+              <VetCard
+                vet={vet}
+                onGetDirections={handleGetDirections}
+              />
             </motion.div>
           ))}
-        </div>
+        </motion.div>
       ) : (
-        <Card className="h-[500px] flex items-center justify-center">
-          <div className="text-center text-gray-500 dark:text-gray-400">
-            <FiMap className="w-16 h-16 mx-auto mb-4 opacity-50" />
-            <p>Map view coming soon</p>
-            <p className="text-sm">Integration with Leaflet/Google Maps</p>
-          </div>
+        /* Empty State */
+        <Card>
+          <EmptyState
+            icon={FiMapPin}
+            title="No clinics found"
+            description={
+              hasActiveFilters
+                ? 'No clinics match your current filters. Try clearing them.'
+                : 'No veterinary clinics found. Make sure your backend has clinic data.'
+            }
+            action={
+              hasActiveFilters
+                ? () => {
+                    setSearchQuery('')
+                    setFilters({
+                      emergency: false,
+                      openNow: false,
+                      radius: '10',
+                    })
+                  }
+                : () => fetchVets(location)
+            }
+            actionLabel={hasActiveFilters ? 'Clear Filters' : 'Retry'}
+          />
         </Card>
       )}
     </div>

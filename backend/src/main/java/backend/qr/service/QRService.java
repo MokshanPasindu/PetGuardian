@@ -1,3 +1,4 @@
+// backend/qr/service/QRService.java
 package backend.qr.service;
 
 import com.google.zxing.BarcodeFormat;
@@ -9,6 +10,7 @@ import backend.common.exception.ResourceNotFoundException;
 import backend.pet.model.Pet;
 import backend.pet.repository.PetRepository;
 import backend.qr.dto.PublicPetProfileDTO;
+import backend.storage.StorageService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -23,6 +25,7 @@ import java.time.Period;
 public class QRService {
 
     private final PetRepository petRepository;
+    private final StorageService storageService; // ← ADD THIS
 
     @Value("${app.frontend.url:http://localhost:3000}")
     private String frontendUrl;
@@ -31,6 +34,12 @@ public class QRService {
         Pet pet = petRepository.findByQrCode(qrCode)
                 .orElseThrow(() -> new ResourceNotFoundException("Pet not found"));
 
+        // ── Resolve image to full URL ────────────────────────────────────────
+        String imageUrl = null;
+        if (pet.getImage() != null && !pet.getImage().isEmpty()) {
+            imageUrl = storageService.getFileUrl(pet.getImage()); // ← FIX
+        }
+
         return PublicPetProfileDTO.builder()
                 .id(pet.getId())
                 .name(pet.getName())
@@ -38,7 +47,7 @@ public class QRService {
                 .breed(pet.getBreed())
                 .gender(pet.getGender())
                 .color(pet.getColor())
-                .image(pet.getImage())
+                .image(imageUrl) // ← now full URL e.g. http://localhost:8080/api/files/pets/abc.jpg
                 .age(calculateAge(pet.getBirthDate()))
                 .microchipId(pet.getMicrochipId())
                 .medicalNotes(pet.getNotes())
@@ -51,11 +60,13 @@ public class QRService {
                 .build();
     }
 
-    public byte[] generateQRCode(String qrCode, int width, int height) throws WriterException, IOException {
+    public byte[] generateQRCode(String qrCode, int width, int height)
+            throws WriterException, IOException {
         String url = frontendUrl + "/pet/" + qrCode;
 
         QRCodeWriter qrCodeWriter = new QRCodeWriter();
-        BitMatrix bitMatrix = qrCodeWriter.encode(url, BarcodeFormat.QR_CODE, width, height);
+        BitMatrix bitMatrix = qrCodeWriter.encode(
+                url, BarcodeFormat.QR_CODE, width, height);
 
         ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
         MatrixToImageWriter.writeToStream(bitMatrix, "PNG", outputStream);
@@ -64,9 +75,7 @@ public class QRService {
     }
 
     private String calculateAge(LocalDate birthDate) {
-        if (birthDate == null) {
-            return "Unknown";
-        }
+        if (birthDate == null) return "Unknown";
 
         Period period = Period.between(birthDate, LocalDate.now());
         int years = period.getYears();

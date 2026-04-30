@@ -1,6 +1,5 @@
 package backend.ai.model;
 
-
 import backend.pet.model.Pet;
 import jakarta.persistence.*;
 import lombok.*;
@@ -22,11 +21,13 @@ public class ScanResult {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    // Image
     @Column(nullable = false)
     private String imageUrl;
 
+    // Core prediction — matches Flask response
     @Column(nullable = false)
-    private String prediction;
+    private String prediction;          // predictedClass from Flask
 
     @Column(nullable = false)
     private Double confidence;
@@ -35,11 +36,23 @@ public class ScanResult {
     @Column(nullable = false)
     private Severity severity;
 
-    @Column(length = 2000)
-    private String recommendations;
+    // Guidance from Flask
+    @Column(columnDefinition = "TEXT")
+    private String guidance;
 
-    @Column(length = 1000)
-    private String possibleConditions;
+    @Column(columnDefinition = "TEXT")
+    private String disclaimer;
+
+    @Column
+    private Boolean vetConnectTriggered;
+
+    // Stored as semicolon-separated string (existing pattern)
+    @Column(length = 2000)
+    private String recommendations;     // homeCareSteps joined
+
+    // Stored as JSON string
+    @Column(length = 2000)
+    private String possibleConditions;  // allPredictions serialized
 
     private boolean savedToMedicalHistory;
 

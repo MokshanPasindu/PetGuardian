@@ -1,3 +1,7 @@
+// backend/config/SecurityConfig.java
+// Only the authorizeHttpRequests section needs updating
+// Add  .requestMatchers("/api/breed/**").authenticated()
+
 package backend.config;
 
 import backend.auth.security.JwtAuthenticationEntryPoint;
@@ -27,9 +31,10 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 @RequiredArgsConstructor
 public class SecurityConfig {
 
-    private final JwtAuthenticationFilter jwtAuthenticationFilter;
-    private final JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint;
-    private final UserDetailsService userDetailsService;
+    private final JwtAuthenticationFilter      jwtAuthenticationFilter;
+    private final JwtAuthenticationEntryPoint  jwtAuthenticationEntryPoint;
+    private final UserDetailsService           userDetailsService;
+
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
@@ -40,35 +45,54 @@ public class SecurityConfig {
                 .sessionManagement(session ->
                         session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        // Public endpoints
+
+                        // ── Public endpoints ──────────────────────────────────────
                         .requestMatchers("/auth/**").permitAll()
                         .requestMatchers("/public/**").permitAll()
                         .requestMatchers("/qr/pet/**").permitAll()
                         .requestMatchers("/h2-console/**").permitAll()
-                        .requestMatchers("/swagger-ui/**", "/api-docs/**", "/swagger-ui.html").permitAll()
+                        .requestMatchers(
+                                "/swagger-ui/**",
+                                "/api-docs/**",
+                                "/swagger-ui.html"
+                        ).permitAll()
                         .requestMatchers(HttpMethod.GET, "/vets/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/uploads/**").permitAll()
 
-                        // ✅ ADD CHATBOT ENDPOINTS
-                        .requestMatchers("/chatbot/health").permitAll()  // Public health check
-                        .requestMatchers("/chatbot/**").authenticated()   // Requires authentication
+                        // ── Chatbot ───────────────────────────────────────────────
+                        .requestMatchers("/chatbot/health").permitAll()
+                        .requestMatchers("/chatbot/**").authenticated()
 
-                        // Admin only endpoints
+                        // ── Notifications ─────────────────────────────────────────
+                        .requestMatchers("/notifications/**").authenticated()
+
+                        // ── NEW: Breed classifier endpoints ───────────────────────
+                        // All /api/breed/** require authentication
+                        // Role checks are handled by @PreAuthorize in BreedController
+                        .requestMatchers("/api/breed/**").authenticated()
+
+                        // ── Admin only ────────────────────────────────────────────
                         .requestMatchers("/admin/**").hasRole("ADMIN")
 
-                        // Vet endpoints
+                        // ── Vet portal ────────────────────────────────────────────
                         .requestMatchers("/vet-portal/**").hasAnyRole("VET", "ADMIN")
 
-                        // All other endpoints require authentication
+                        // ── Everything else requires auth ─────────────────────────
                         .anyRequest().authenticated()
                 )
                 .authenticationProvider(authenticationProvider())
-                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
+                .addFilterBefore(
+                        jwtAuthenticationFilter,
+                        UsernamePasswordAuthenticationFilter.class
+                );
 
-        http.headers(headers -> headers.frameOptions(frame -> frame.sameOrigin()));
+        http.headers(headers ->
+                headers.frameOptions(frame -> frame.sameOrigin())
+        );
 
         return http.build();
     }
+
     @Bean
     public AuthenticationProvider authenticationProvider() {
         DaoAuthenticationProvider authProvider = new DaoAuthenticationProvider();
@@ -78,7 +102,9 @@ public class SecurityConfig {
     }
 
     @Bean
-    public AuthenticationManager authenticationManager(AuthenticationConfiguration config) throws Exception {
+    public AuthenticationManager authenticationManager(
+            AuthenticationConfiguration config
+    ) throws Exception {
         return config.getAuthenticationManager();
     }
 

@@ -1,3 +1,6 @@
+// backend/chatbot/dto/ChatResponse.java
+// UPDATED — keeps existing fields, adds suggestVet
+
 package backend.chatbot.dto;
 
 import lombok.AllArgsConstructor;
@@ -12,8 +15,13 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 @AllArgsConstructor
 public class ChatResponse {
-    private Long id;
-    private String message;
-    private boolean isBot;
+
+    // ── Existing fields (unchanged) ────────────────────────
+    private Long          id;
+    private String        message;
+    private boolean       isBot;
     private LocalDateTime timestamp;
+
+    // ── New field for Vet Connect trigger ─────────────────
+    private boolean suggestVet;
 }
