@@ -4,6 +4,7 @@ import { Toaster } from 'react-hot-toast'
 import { useAuth } from './hooks/useAuth'
 import { PetProvider } from './context/PetContext'
 import { HealthProvider } from './context/HealthContext'
+import { NotificationProvider } from './context/NotificationContext'
 
 // Layout
 import Layout from './components/layout/Layout'
@@ -60,22 +61,31 @@ import VetClinics from './pages/admin/VetClinics'
 import UserProfile from './pages/profile/UserProfile'
 import Settings from './pages/profile/Settings'
 
+// ── NEW: Notifications ─────────────────────────────────────
+import NotificationsPage
+  from './pages/notifications/NotificationsPage'
+
 // Components
 import ChatBot from './components/chat/ChatBot'
 import LoadingSpinner from './components/common/LoadingSpinner'
 
-// ─── Protected Route ────────────────────────────────────────────────────────
-// Checks authentication + optional role restriction
+// ── NEW: Notification Components ───────────────────────────
+import SevereAlertToast
+  from './components/notification/SevereAlertToast'
+
+// ─── Protected Route ────────────────────────────────────────
 const ProtectedRoute = ({ children, allowedRoles }) => {
   const { user, isAuthenticated, loading } = useAuth()
 
-  // Show spinner while auth state is being determined
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
+      <div className="min-h-screen flex items-center
+                      justify-center bg-gray-50
+                      dark:bg-gray-900">
         <div className="flex flex-col items-center gap-4">
           <LoadingSpinner size="xl" />
-          <p className="text-gray-500 dark:text-gray-400 font-medium">
+          <p className="text-gray-500 dark:text-gray-400
+                        font-medium">
             Authenticating...
           </p>
         </div>
@@ -83,253 +93,334 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
     )
   }
 
-  // Not logged in → redirect to login
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />
   }
 
-  // Logged in but wrong role → redirect to their dashboard
   if (allowedRoles && !allowedRoles.includes(user?.role)) {
     console.warn(
-      `Access denied. User role: ${user?.role}, Required: ${allowedRoles.join(', ')}`
+      `Access denied. User role: ${user?.role}, ` +
+      `Required: ${allowedRoles.join(', ')}`
     )
-    // Redirect to role-appropriate dashboard
-    if (user?.role === 'ADMIN') return <Navigate to="/admin-dashboard" replace />
-    if (user?.role === 'VET') return <Navigate to="/vet-dashboard" replace />
+    if (user?.role === 'ADMIN')
+      return <Navigate to="/admin-dashboard" replace />
+    if (user?.role === 'VET')
+      return <Navigate to="/vet-dashboard" replace />
     return <Navigate to="/dashboard" replace />
   }
 
   return children
 }
 
-// ─── Role Route ─────────────────────────────────────────────────────────────
-// Only checks role (used inside already-protected routes)
+// ─── Role Route ─────────────────────────────────────────────
 const RoleRoute = ({ children, allowedRoles }) => {
   const { user } = useAuth()
 
   if (allowedRoles && !allowedRoles.includes(user?.role)) {
     console.warn(
-      `Access denied. User role: ${user?.role}, Required: ${allowedRoles.join(', ')}`
+      `Access denied. User role: ${user?.role}, ` +
+      `Required: ${allowedRoles.join(', ')}`
     )
-    if (user?.role === 'ADMIN') return <Navigate to="/admin-dashboard" replace />
-    if (user?.role === 'VET') return <Navigate to="/vet-dashboard" replace />
+    if (user?.role === 'ADMIN')
+      return <Navigate to="/admin-dashboard" replace />
+    if (user?.role === 'VET')
+      return <Navigate to="/vet-dashboard" replace />
     return <Navigate to="/dashboard" replace />
   }
 
   return children
 }
 
-// ─── App ────────────────────────────────────────────────────────────────────
+// ─── App ────────────────────────────────────────────────────
 function App() {
   const { isAuthenticated } = useAuth()
 
   return (
-    <PetProvider>
-      <HealthProvider>
-        {/* ── Toast Notifications ─────────────────────────────────── */}
-        <Toaster
-          position="top-right"
-          toastOptions={{
-            duration: 4000,
-            style: {
-              borderRadius: '12px',
-              padding: '12px 16px',
-              fontSize: '14px',
-            },
-            success: {
+    // ── NotificationProvider wraps everything so all
+    //    components can access notifications
+    <NotificationProvider>
+      <PetProvider>
+        <HealthProvider>
+
+          {/* ── Global Severe Alert Toast ─────────────────────
+              Mounted globally — auto-triggers when AI detects
+              a SEVERE condition. Shows red popup with
+              "Find Nearest Vet" button.
+          ────────────────────────────────────────────────── */}
+          {isAuthenticated && <SevereAlertToast />}
+
+          {/* ── react-hot-toast (for success/error toasts) ── */}
+          <Toaster
+            position="top-right"
+            toastOptions={{
+              duration: 4000,
               style: {
-                background: '#f0fdf4',
-                color: '#166534',
-                border: '1px solid #bbf7d0',
+                borderRadius: '12px',
+                padding: '12px 16px',
+                fontSize: '14px',
               },
-              iconTheme: {
-                primary: '#22c55e',
-                secondary: '#fff',
+              success: {
+                style: {
+                  background: '#f0fdf4',
+                  color: '#166534',
+                  border: '1px solid #bbf7d0',
+                },
+                iconTheme: {
+                  primary: '#22c55e',
+                  secondary: '#fff',
+                },
               },
-            },
-            error: {
-              style: {
-                background: '#fef2f2',
-                color: '#991b1b',
-                border: '1px solid #fecaca',
+              error: {
+                style: {
+                  background: '#fef2f2',
+                  color: '#991b1b',
+                  border: '1px solid #fecaca',
+                },
+                iconTheme: {
+                  primary: '#ef4444',
+                  secondary: '#fff',
+                },
               },
-              iconTheme: {
-                primary: '#ef4444',
-                secondary: '#fff',
+              loading: {
+                style: {
+                  background: '#eff6ff',
+                  color: '#1e40af',
+                  border: '1px solid #bfdbfe',
+                },
               },
-            },
-            loading: {
-              style: {
-                background: '#eff6ff',
-                color: '#1e40af',
-                border: '1px solid #bfdbfe',
-              },
-            },
-          }}
-        />
+            }}
+          />
 
-        <Routes>
-          {/* ── Public Routes ──────────────────────────────────────── */}
-          <Route path="/" element={<Home />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/register" element={<Register />} />
-          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Routes>
 
-          {/* Public QR Profile - accessible without login */}
-          <Route path="/pet/:qrCode" element={<PublicPetProfile />} />
-
-          {/* ── Protected Routes with Layout ───────────────────────── */}
-          <Route
-            path="/*"
-            element={
-              <ProtectedRoute>
-                <Layout />
-              </ProtectedRoute>
-            }
-          >
-            {/* ── Dashboard Routes ─────────────────────────────────── */}
-            <Route path="dashboard" element={<OwnerDashboard />} />
-
+            {/* ════════════════════════════════════════════════
+                PUBLIC ROUTES — no auth required
+            ════════════════════════════════════════════════ */}
+            <Route path="/" element={<Home />} />
+            <Route path="/login" element={<Login />} />
+            <Route path="/register" element={<Register />} />
             <Route
-              path="vet-dashboard"
+              path="/forgot-password"
+              element={<ForgotPassword />}
+            />
+
+            {/* Public QR Profile — accessible without login
+                Anyone who scans a pet QR code lands here    */}
+            <Route
+              path="/pet/:qrCode"
+              element={<PublicPetProfile />}
+            />
+
+            {/* ════════════════════════════════════════════════
+                PROTECTED ROUTES — auth required
+                All rendered inside <Layout /> (Navbar + Sidebar)
+            ════════════════════════════════════════════════ */}
+            <Route
+              path="/*"
               element={
-                <RoleRoute allowedRoles={['VET', 'ADMIN']}>
-                  <VetDashboard />
-                </RoleRoute>
+                <ProtectedRoute>
+                  <Layout />
+                </ProtectedRoute>
               }
-            />
+            >
 
-            <Route
-              path="admin-dashboard"
-              element={
-                <RoleRoute allowedRoles={['ADMIN']}>
-                  <AdminDashboard />
-                </RoleRoute>
-              }
-            />
+              {/* ── Dashboard Routes ─────────────────────── */}
+              <Route
+                path="dashboard"
+                element={<OwnerDashboard />}
+              />
 
-            {/* ── Admin Routes ─────────────────────────────────────── */}
-            <Route
-              path="admin/users"
-              element={
-                <RoleRoute allowedRoles={['ADMIN']}>
-                  <Users />
-                </RoleRoute>
-              }
-            />
-            <Route
-              path="admin/content-moderation"
-              element={
-                <RoleRoute allowedRoles={['ADMIN']}>
-                  <ContentModeration />
-                </RoleRoute>
-              }
-            />
-            <Route
-              path="admin/vet-clinics"
-              element={
-                <RoleRoute allowedRoles={['ADMIN']}>
-                  <VetClinics />
-                </RoleRoute>
-              }
-            />
+              <Route
+                path="vet-dashboard"
+                element={
+                  <RoleRoute allowedRoles={['VET', 'ADMIN']}>
+                    <VetDashboard />
+                  </RoleRoute>
+                }
+              />
 
-            {/* ── Pet Routes ───────────────────────────────────────── */}
-            <Route path="pets" element={<MyPets />} />
-            <Route path="pets/add" element={<AddPet />} />
-            <Route path="pets/:id" element={<PetDetails />} />
-            <Route path="pets/:id/edit" element={<EditPet />} />
+              <Route
+                path="admin-dashboard"
+                element={
+                  <RoleRoute allowedRoles={['ADMIN']}>
+                    <AdminDashboard />
+                  </RoleRoute>
+                }
+              />
 
-            {/* ── Health Routes ────────────────────────────────────── */}
-            {/*
-              IMPORTANT: Route parameter names must match useParams() calls
-              in each page component:
-                HealthPassport  → useParams() = { petId }
-                MedicalHistory  → useParams() = { petId }
-                AddRecord       → useParams() = { petId, recordId? }
-                Vaccinations    → useParams() = { petId }
-            */}
-            <Route path="health/:petId" element={<HealthPassport />} />
-            <Route path="health/:petId/history" element={<MedicalHistory />} />
+              {/* ── Admin Routes ─────────────────────────── */}
+              <Route
+                path="admin/users"
+                element={
+                  <RoleRoute allowedRoles={['ADMIN']}>
+                    <Users />
+                  </RoleRoute>
+                }
+              />
+              <Route
+                path="admin/content-moderation"
+                element={
+                  <RoleRoute allowedRoles={['ADMIN']}>
+                    <ContentModeration />
+                  </RoleRoute>
+                }
+              />
+              <Route
+                path="admin/vet-clinics"
+                element={
+                  <RoleRoute allowedRoles={['ADMIN']}>
+                    <VetClinics />
+                  </RoleRoute>
+                }
+              />
 
-            {/* AddRecord handles both CREATE and EDIT */}
-            {/* CREATE: /health/:petId/records/add */}
-            <Route
-              path="health/:petId/records/add"
-              element={<AddRecord />}
-            />
+              {/* ── Pet Routes ───────────────────────────── */}
+              <Route path="pets"          element={<MyPets />} />
+              <Route path="pets/add"      element={<AddPet />} />
+              <Route path="pets/:id"      element={<PetDetails />} />
+              <Route path="pets/:id/edit" element={<EditPet />} />
 
-            {/* ✅ EDIT - recordId must match useParams() in AddRecord.jsx */}
-            <Route
-              path="health/:petId/records/:recordId/edit"
-              element={<AddRecord />}
-            />
+              {/* ── Health Routes ────────────────────────── */}
+              <Route
+                path="health/:petId"
+                element={<HealthPassport />}
+              />
+              <Route
+                path="health/:petId/history"
+                element={<MedicalHistory />}
+              />
 
-            {/* Legacy route - keep for backwards compat */}
-            <Route
-              path="health/:petId/add-record"
-              element={<AddRecord />}
-            />
+              {/* CREATE medical record */}
+              <Route
+                path="health/:petId/records/add"
+                element={<AddRecord />}
+              />
 
-            <Route
-              path="health/:petId/vaccinations"
-              element={<Vaccinations />}
-            />
+              {/* EDIT medical record */}
+              <Route
+                path="health/:petId/records/:recordId/edit"
+                element={<AddRecord />}
+              />
 
-            {/* ── AI Scan Routes ───────────────────────────────────── */}
-            <Route path="scan" element={<ScanPage />} />
-            <Route path="scan/history" element={<ScanHistory />} />
-            
-            {/* ── Vet Connect Routes ───────────────────────────────── */}
-            <Route path="vets" element={<FindVet />} />
-            <Route path="vets/:id" element={<VetProfile />} />
-            <Route path="appointments" element={<Appointments />} />
-            <Route path="vet/appointments" element={<VetAppointments />} />  
+              {/* Legacy route — kept for backwards compat */}
+              <Route
+                path="health/:petId/add-record"
+                element={<AddRecord />}
+              />
 
-            {/* ── QR Routes ────────────────────────────────────────── */}
-            <Route path="qr" element={<QRManagement />} />
+              <Route
+                path="health/:petId/vaccinations"
+                element={<Vaccinations />}
+              />
 
-            {/* ── Community Routes ─────────────────────────────────── */}
-            <Route path="community" element={<CommunityHome />} />
-            <Route path="community/create" element={<CreatePost />} />
-            <Route path="community/edit/:id" element={<EditPost />} />
-            <Route path="community/post/:id" element={<PostDetails />} />
+              {/* ── AI Scan Routes ───────────────────────── */}
+              <Route path="scan"         element={<ScanPage />} />
+              <Route
+                path="scan/history"
+                element={<ScanHistory />}
+              />
 
-            {/* ── Profile Routes ───────────────────────────────────── */}
-            <Route path="profile" element={<UserProfile />} />
-            <Route path="settings" element={<Settings />} />
+              {/* ── Vet Connect Routes ───────────────────── */}
+              <Route path="vets"       element={<FindVet />} />
+              <Route path="vets/:id"   element={<VetProfile />} />
+              <Route
+                path="appointments"
+                element={<Appointments />}
+              />
+              <Route
+                path="vet/appointments"
+                element={
+                  <RoleRoute allowedRoles={['VET', 'ADMIN']}>
+                    <VetAppointments />
+                  </RoleRoute>
+                }
+              />
 
-            {/* ── Catch-all inside protected layout ────────────────── */}
-            <Route
-              path="*"
-              element={
-                <div className="flex flex-col items-center justify-center min-h-[60vh] text-center px-4">
-                  <p className="text-6xl mb-4">🐾</p>
-                  <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
-                    Page Not Found
-                  </h2>
-                  <p className="text-gray-500 dark:text-gray-400 mb-6">
-                    The page you're looking for doesn't exist.
-                  </p>
-                  <a
-                    href="/dashboard"
-                    className="px-6 py-3 bg-primary-500 text-white rounded-xl hover:bg-primary-600 transition-colors font-medium"
-                  >
-                    Go to Dashboard
-                  </a>
-                </div>
-              }
-            />
-          </Route>
+              {/* ── QR Routes ────────────────────────────── */}
+              <Route path="qr" element={<QRManagement />} />
 
-          {/* ── Global Catch-all ─────────────────────────────────────── */}
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
+              {/* ── Community Routes ─────────────────────── */}
+              <Route
+                path="community"
+                element={<CommunityHome />}
+              />
+              <Route
+                path="community/create"
+                element={<CreatePost />}
+              />
+              <Route
+                path="community/edit/:id"
+                element={<EditPost />}
+              />
+              <Route
+                path="community/post/:id"
+                element={<PostDetails />}
+              />
 
-        {/* ── ChatBot - Only shown when authenticated ───────────────── */}
-        {isAuthenticated && <ChatBot />}
-      </HealthProvider>
-    </PetProvider>
+              {/* ── Notifications Route ──────────────────── */}
+              {/*
+                Full notifications page with:
+                - Filter tabs (All / Unread / AI / Appointments
+                  / Vaccinations / Community / System)
+                - Mark all read
+                - Clear read notifications
+                - Delete individual notifications
+                - Navigate to action URL on click
+              */}
+              <Route
+                path="notifications"
+                element={<NotificationsPage />}
+              />
+
+              {/* ── Profile Routes ───────────────────────── */}
+              <Route path="profile"  element={<UserProfile />} />
+              <Route path="settings" element={<Settings />} />
+
+              {/* ── Catch-all inside protected layout ─────── */}
+              <Route
+                path="*"
+                element={
+                  <div className="flex flex-col items-center
+                                  justify-center min-h-[60vh]
+                                  text-center px-4">
+                    <p className="text-6xl mb-4">🐾</p>
+                    <h2 className="text-2xl font-bold
+                                   text-gray-900 dark:text-white
+                                   mb-2">
+                      Page Not Found
+                    </h2>
+                    <p className="text-gray-500 dark:text-gray-400
+                                  mb-6">
+                      The page you're looking for doesn't exist.
+                    </p>
+                    <a
+                      href="/dashboard"
+                      className="px-6 py-3 bg-primary-500
+                                 text-white rounded-xl
+                                 hover:bg-primary-600
+                                 transition-colors font-medium"
+                    >
+                      Go to Dashboard
+                    </a>
+                  </div>
+                }
+              />
+            </Route>
+
+            {/* ── Global Catch-all ────────────────────────── */}
+            <Route path="*" element={<Navigate to="/" replace />} />
+
+          </Routes>
+
+          {/* ── ChatBot ─────────────────────────────────────
+              Only shown when user is authenticated.
+              Floats on bottom-right corner.
+          ─────────────────────────────────────────────── */}
+          {isAuthenticated && <ChatBot />}
+
+        </HealthProvider>
+      </PetProvider>
+    </NotificationProvider>
   )
 }
 

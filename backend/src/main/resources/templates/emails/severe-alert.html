@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head>
+    <meta charset="UTF-8"/>
+    <style>
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',
+             Roboto,sans-serif;background:#f8fafc;color:#1e293b}
+        .wrap{max-width:600px;margin:40px auto;background:#fff;
+              border-radius:16px;overflow:hidden;
+              box-shadow:0 4px 24px rgba(0,0,0,.08)}
+        .hdr{background:linear-gradient(135deg,#dc2626,#b91c1c);
+             padding:40px 32px;text-align:center}
+        .hdr-icon{font-size:56px;display:block}
+        .hdr h1{color:#fff;font-size:26px;font-weight:700;margin-top:12px}
+        .hdr p{color:rgba(255,255,255,.9);font-size:14px;margin-top:6px}
+        .badge{display:inline-block;background:rgba(255,255,255,.2);
+               color:#fff;padding:4px 16px;border-radius:20px;
+               font-size:12px;font-weight:700;letter-spacing:1px;margin-top:12px}
+        .body{padding:40px 32px}
+        .greeting{font-size:18px;font-weight:600;margin-bottom:12px}
+        .text{font-size:15px;color:#475569;line-height:1.7;margin-bottom:16px}
+        .alert-box{background:#fef2f2;border:2px solid #fecaca;
+                   border-left:4px solid #dc2626;border-radius:10px;
+                   padding:20px;margin:24px 0}
+        .alert-box h3{color:#dc2626;font-size:15px;font-weight:700;margin-bottom:8px}
+        .alert-box p{color:#7f1d1d;font-size:14px;line-height:1.6}
+        .detect-card{background:#f8fafc;border-radius:10px;padding:20px;
+                     margin:20px 0;border:1px solid #e2e8f0}
+        .detect-label{font-size:11px;font-weight:700;text-transform:uppercase;
+                      letter-spacing:.5px;color:#64748b;margin-bottom:4px}
+        .detect-val{font-size:20px;font-weight:700;color:#dc2626}
+        .steps{margin:20px 0}
+        .step{display:flex;gap:12px;margin-bottom:12px;align-items:flex-start}
+        .step-num{width:28px;height:28px;background:#dc2626;color:#fff;
+                  border-radius:50%;font-size:13px;font-weight:700;
+                  display:flex;align-items:center;justify-content:center;flex-shrink:0}
+        .step-text{font-size:14px;color:#374151;line-height:1.5;padding-top:4px}
+        .btn-row{display:flex;gap:12px;margin:28px 0;flex-wrap:wrap}
+        .btn-red{flex:1;display:inline-block;background:#dc2626;
+                 color:#fff!important;text-decoration:none;
+                 padding:14px 24px;border-radius:10px;
+                 font-size:14px;font-weight:700;text-align:center;min-width:140px}
+        .btn-gray{flex:1;display:inline-block;background:#f1f5f9;
+                  color:#475569!important;text-decoration:none;
+                  padding:14px 24px;border-radius:10px;
+                  font-size:14px;font-weight:600;text-align:center;min-width:140px}
+        .disclaimer{background:#fffbeb;border:1px solid #fde68a;
+                    border-radius:8px;padding:14px;
+                    font-size:12px;color:#92400e;line-height:1.5}
+        .footer{background:#f8fafc;padding:24px 32px;text-align:center;
+                border-top:1px solid #e2e8f0}
+        .footer p{font-size:12px;color:#94a3b8}
+    </style>
+</head>
+<body>
+<div class="wrap">
+
+    <div class="hdr">
+        <span class="hdr-icon">🚨</span>
+        <h1>Urgent Health Alert</h1>
+        <p>Severe AI Condition Detected</p>
+        <span class="badge">⚠️ IMMEDIATE ACTION REQUIRED</span>
+    </div>
+
+    <div class="body">
+        <p class="greeting">
+            Dear <span th:text="${ownerName}">Owner</span>,
+        </p>
+        <p class="text">
+            PetGuardian's AI has detected a potentially
+            <strong>severe skin condition</strong> in
+            <strong th:text="${petName}">your pet</strong>.
+            This requires <strong>immediate veterinary attention</strong>.
+        </p>
+
+        <div class="alert-box">
+            <h3>⚠️ Do not delay seeking veterinary care</h3>
+            <p>
+                Severe conditions can worsen rapidly. Please contact
+                your nearest vet immediately or use Vet Connect below.
+            </p>
+        </div>
+
+        <div class="detect-card">
+            <p class="detect-label">AI Detected Condition</p>
+            <p class="detect-val" th:text="${predictedCondition}">
+                Condition
+            </p>
+            <p style="font-size:12px;color:#64748b;margin-top:6px">
+                Severity: SEVERE · Immediate care recommended
+            </p>
+        </div>
+
+        <h3 style="font-size:15px;font-weight:700;margin-bottom:14px">
+            What to do right now:
+        </h3>
+        <div class="steps">
+            <div class="step">
+                <div class="step-num">1</div>
+                <p class="step-text">
+                    <strong>Stay calm</strong> — keep your pet comfortable
+                    and restrict movement.
+                </p>
+            </div>
+            <div class="step">
+                <div class="step-num">2</div>
+                <p class="step-text">
+                    <strong>Do NOT apply</strong> any home remedies
+                    or human medications.
+                </p>
+            </div>
+            <div class="step">
+                <div class="step-num">3</div>
+                <p class="step-text">
+                    <strong>Contact a vet immediately</strong> — use
+                    Vet Connect to find the nearest clinic.
+                </p>
+            </div>
+            <div class="step">
+                <div class="step-num">4</div>
+                <p class="step-text">
+                    <strong>Bring medical records</strong> — your
+                    Health Passport is available in the app.
+                </p>
+            </div>
+        </div>
+
+        <div class="btn-row">
+            <a th:href="${vetConnectUrl}" class="btn-red">
+                🗺️ Find Nearest Vet
+            </a>
+            <a th:href="${scanUrl}" class="btn-gray">
+                📋 View Scan Result
+            </a>
+        </div>
+
+        <div class="disclaimer">
+            ⚠️ <strong>Disclaimer:</strong> This alert is generated by an
+            AI preliminary screening system. It does not constitute a
+            veterinary diagnosis. Always consult a licensed veterinarian.
+        </div>
+    </div>
+
+    <div class="footer">
+        <p>🐾 PetGuardian · © 2025 · All rights reserved</p>
+    </div>
+
+</div>
+</body>
+</html>

@@ -61,6 +61,9 @@ public class Pet {
     @CreatedDate
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
+    // ADD this field to your existing Pet.java
+
+
 
     @LastModifiedDate
     private LocalDateTime updatedAt;

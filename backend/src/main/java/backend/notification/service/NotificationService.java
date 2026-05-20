@@ -1,12 +1,13 @@
 package backend.notification.service;
 
+import backend.medical.model.Vaccination;
+import backend.medical.repository.VaccinationRepository;
 import backend.notification.dto.NotificationDTO;
 import backend.notification.model.Notification;
 import backend.notification.model.NotificationType;
 import backend.notification.repository.NotificationRepository;
 import backend.user.model.User;
 import backend.user.repository.UserRepository;
-import backend.common.exception.ResourceNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
@@ -14,6 +15,8 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -24,6 +27,25 @@ public class NotificationService {
 
     private final NotificationRepository notificationRepository;
     private final UserRepository         userRepository;
+    private final VaccinationRepository  vaccinationRepository;
+    private final EmailService           emailService;
+
+    private static final DateTimeFormatter DATE_FMT =
+            DateTimeFormatter.ofPattern("MMMM d, yyyy");
+
+    // ═══════════════════════════════════════════════════════════
+    // CORRECT ROUTES — matching App.jsx exactly
+    // ═══════════════════════════════════════════════════════════
+    //
+    //  /scan/history           ← AI scan history
+    //  /appointments           ← Owner appointments
+    //  /vets                   ← Find vet (Vet Connect)
+    //  /health/:petId/vaccinations ← Vaccinations
+    //  /community/post/:id     ← Post details
+    //  /pets/:id               ← Pet details
+    //  /dashboard              ← Owner dashboard
+    //
+    // ═══════════════════════════════════════════════════════════
 
     // ═══════════════════════════════════════════════════════════
     // FETCH
@@ -32,9 +54,7 @@ public class NotificationService {
     public List<NotificationDTO> getUserNotifications(User user) {
         return notificationRepository
                 .findByUserIdOrderByCreatedAtDesc(
-                        user.getId(),
-                        PageRequest.of(0, 50)
-                )
+                        user.getId(), PageRequest.of(0, 50))
                 .stream()
                 .map(this::toDTO)
                 .collect(Collectors.toList());
@@ -42,7 +62,8 @@ public class NotificationService {
 
     public List<NotificationDTO> getUnreadNotifications(User user) {
         return notificationRepository
-                .findByUserIdAndReadFalseOrderByCreatedAtDesc(user.getId())
+                .findByUserIdAndReadFalseOrderByCreatedAtDesc(
+                        user.getId())
                 .stream()
                 .map(this::toDTO)
                 .collect(Collectors.toList());
@@ -65,38 +86,41 @@ public class NotificationService {
     @Transactional
     public void markAllAsRead(User user) {
         notificationRepository.markAllAsRead(user.getId());
-        log.info("Marked all notifications read for user {}", user.getId());
+        log.info("All notifications marked read | user={}",
+                user.getId());
     }
 
     @Transactional
     public void deleteNotification(Long id, User user) {
-        notificationRepository.deleteByIdAndUserId(id, user.getId());
+        notificationRepository.deleteByIdAndUserId(
+                id, user.getId());
     }
 
     @Transactional
     public void clearReadNotifications(User user) {
-        notificationRepository.deleteAllReadByUserId(user.getId());
+        notificationRepository.deleteAllReadByUserId(
+                user.getId());
     }
 
     // ═══════════════════════════════════════════════════════════
-    // CREATE — called from other services
+    // CORE CREATE
     // ═══════════════════════════════════════════════════════════
 
     @Transactional
     public void createNotification(
-            User            user,
+            User             user,
             NotificationType type,
-            String          title,
-            String          message,
-            String          actionUrl,
-            Long            referenceId
+            String           title,
+            String           message,
+            String           actionUrl,
+            Long             referenceId
     ) {
-        // Avoid duplicate unread notifications
+        // ── Duplicate guard ────────────────────────────────────
         if (referenceId != null &&
                 notificationRepository
                         .existsByUserIdAndTypeAndReferenceIdAndReadFalse(
                                 user.getId(), type, referenceId)) {
-            log.debug("Skipping duplicate notification type={} ref={}",
+            log.debug("Duplicate skipped | type={} ref={}",
                     type, referenceId);
             return;
         }
@@ -112,17 +136,19 @@ public class NotificationService {
                 .build();
 
         notificationRepository.save(n);
-        log.info("Notification created | user={} type={} title='{}'",
+        log.info("Notification created | user={} type={} | {}",
                 user.getId(), type, title);
     }
 
     // ── Convenience overloads ──────────────────────────────────
+
     @Transactional
     public void createNotification(
             User user, NotificationType type,
             String title, String message
     ) {
-        createNotification(user, type, title, message, null, null);
+        createNotification(
+                user, type, title, message, null, null);
     }
 
     @Transactional
@@ -130,11 +156,12 @@ public class NotificationService {
             User user, NotificationType type,
             String title, String message, String actionUrl
     ) {
-        createNotification(user, type, title, message, actionUrl, null);
+        createNotification(
+                user, type, title, message, actionUrl, null);
     }
 
     // ═══════════════════════════════════════════════════════════
-    // WELCOME NOTIFICATION
+    // WELCOME
     // ═══════════════════════════════════════════════════════════
 
     @Transactional
@@ -143,10 +170,19 @@ public class NotificationService {
                 user,
                 NotificationType.WELCOME,
                 "Welcome to PetGuardian! 🐾",
-                "Start by adding your first pet profile and " +
-                        "keep their health records in one place.",
-                "/pets/add"
+                "Start by adding your first pet and keep " +
+                        "their health records in one place.",
+                "/pets/add"   // ✅ matches App.jsx
         );
+
+        try {
+            emailService.sendWelcomeEmail(
+                    user.getEmail(),
+                    user.getFirstName()
+            );
+        } catch (Exception e) {
+            log.warn("Welcome email failed: {}", e.getMessage());
+        }
     }
 
     // ═══════════════════════════════════════════════════════════
@@ -155,11 +191,26 @@ public class NotificationService {
 
     @Transactional
     public void sendAIScanNotification(
-            User   user,
-            Long   scanId,
-            String predictedClass,
-            String severity,
+            User    user,
+            Long    scanId,
+            String  predictedClass,
+            String  severity,
             boolean vetConnectTriggered
+    ) {
+        sendAIScanNotification(
+                user, scanId, predictedClass,
+                severity, vetConnectTriggered, "your pet"
+        );
+    }
+
+    @Transactional
+    public void sendAIScanNotification(
+            User    user,
+            Long    scanId,
+            String  predictedClass,
+            String  severity,
+            boolean vetConnectTriggered,
+            String  petName
     ) {
         if ("SEVERE".equalsIgnoreCase(severity)) {
             createNotification(
@@ -167,18 +218,33 @@ public class NotificationService {
                     NotificationType.AI_SCAN_SEVERE,
                     "⚠️ Severe Condition Detected",
                     "AI detected '" + predictedClass +
-                            "' — immediate veterinary care is recommended.",
-                    "/scan/history",
+                            "' in " + petName +
+                            " — immediate vet care recommended.",
+                    "/scan/history",   // ✅ matches App.jsx
                     scanId
             );
+
+            try {
+                emailService.sendSevereAlertEmail(
+                        user.getEmail(),
+                        user.getFullName(),
+                        petName,
+                        predictedClass
+                );
+            } catch (Exception e) {
+                log.warn("Severe alert email failed: {}",
+                        e.getMessage());
+            }
+
         } else {
             createNotification(
                     user,
                     NotificationType.AI_SCAN_COMPLETE,
-                    "AI Scan Complete",
-                    "Analysis result: " + predictedClass +
-                            " (" + severity.toLowerCase() + " severity).",
-                    "/scan/history",
+                    "AI Scan Complete ✅",
+                    petName + "'s scan result: " +
+                            predictedClass + " (" +
+                            severity.toLowerCase() + " severity).",
+                    "/scan/history",   // ✅ matches App.jsx
                     scanId
             );
         }
@@ -199,13 +265,28 @@ public class NotificationService {
         createNotification(
                 user,
                 NotificationType.APPOINTMENT_BOOKED,
-                "Appointment Booked",
+                "Appointment Booked 📅",
                 "Appointment for " + petName +
                         " at " + clinicName +
-                        " on " + date + " is confirmed.",
-                "/appointments",
+                        " on " + date + " has been booked.",
+                "/appointments",   // ✅ matches App.jsx
                 appointmentId
         );
+
+        try {
+            emailService.sendAppointmentBookedEmail(
+                    user.getEmail(),
+                    user.getFullName(),
+                    petName,
+                    clinicName,
+                    date,
+                    null,
+                    null
+            );
+        } catch (Exception e) {
+            log.warn("Appointment booked email failed: {}",
+                    e.getMessage());
+        }
     }
 
     @Transactional
@@ -220,10 +301,25 @@ public class NotificationService {
                 NotificationType.APPOINTMENT_CONFIRMED,
                 "Appointment Confirmed ✅",
                 "Your appointment for " + petName +
-                        " at " + clinicName + " has been confirmed.",
-                "/appointments",
+                        " at " + clinicName +
+                        " has been confirmed.",
+                "/appointments",   // ✅ matches App.jsx
                 appointmentId
         );
+
+        try {
+            emailService.sendAppointmentConfirmedEmail(
+                    user.getEmail(),
+                    user.getFullName(),
+                    petName,
+                    clinicName,
+                    "Confirmed",
+                    null
+            );
+        } catch (Exception e) {
+            log.warn("Appointment confirmed email failed: {}",
+                    e.getMessage());
+        }
     }
 
     @Transactional
@@ -235,48 +331,63 @@ public class NotificationService {
         createNotification(
                 user,
                 NotificationType.APPOINTMENT_CANCELLED,
-                "Appointment Cancelled",
+                "Appointment Cancelled ❌",
                 "Your appointment for " + petName +
                         " has been cancelled.",
-                "/appointments",
+                "/appointments",   // ✅ matches App.jsx
                 appointmentId
         );
-    }
 
-    // ═══════════════════════════════════════════════════════════
-    // VACCINATION NOTIFICATIONS (scheduled)
-    // ═══════════════════════════════════════════════════════════
-
-    @Scheduled(cron = "0 0 8 * * *") // Every day at 8:00 AM
-    @Transactional
-    public void sendVaccinationReminders() {
-        log.info("Running vaccination reminder job...");
         try {
-            checkVaccinationsDue();
+            emailService.sendAppointmentCancelledEmail(
+                    user.getEmail(),
+                    user.getFullName(),
+                    petName,
+                    "your clinic"
+            );
         } catch (Exception e) {
-            log.error("Vaccination reminder job failed: {}", e.getMessage());
+            log.warn("Appointment cancelled email failed: {}",
+                    e.getMessage());
         }
     }
 
-    private void checkVaccinationsDue() {
-        // Get all users
-        List<User> users = userRepository.findAll();
+    @Transactional
+    public void sendAppointmentReminderNotification(
+            User   user,
+            Long   appointmentId,
+            String petName,
+            String clinicName,
+            String date
+    ) {
+        createNotification(
+                user,
+                NotificationType.APPOINTMENT_REMINDER,
+                "Appointment Tomorrow 🔔",
+                petName + "'s appointment at " +
+                        clinicName + " is tomorrow, " +
+                        date + ".",
+                "/appointments",   // ✅ matches App.jsx
+                appointmentId
+        );
 
-        for (User user : users) {
-            try {
-                sendVaccinationReminderForUser(user);
-            } catch (Exception e) {
-                log.warn("Failed to send vaccination reminder for user {}: {}",
-                        user.getId(), e.getMessage());
-            }
+        try {
+            emailService.sendAppointmentReminderEmail(
+                    user.getEmail(),
+                    user.getFullName(),
+                    petName,
+                    clinicName,
+                    date,
+                    null
+            );
+        } catch (Exception e) {
+            log.warn("Appointment reminder email failed: {}",
+                    e.getMessage());
         }
     }
 
-    private void sendVaccinationReminderForUser(User user) {
-        // This will be called from MedicalService when vaccinations
-        // are checked — placeholder for now
-        log.debug("Checking vaccinations for user {}", user.getId());
-    }
+    // ═══════════════════════════════════════════════════════════
+    // VACCINATION NOTIFICATIONS
+    // ═══════════════════════════════════════════════════════════
 
     @Transactional
     public void sendVaccinationDueNotification(
@@ -286,15 +397,68 @@ public class NotificationService {
             String vaccineName,
             String dueDate
     ) {
+        // ── Get petId for correct URL ──────────────────────────
+        // actionUrl = /health/:petId/vaccinations
+        // We use referenceId (vaccinationId) to build URL
+        // Frontend navigates to vaccination page for that pet
         createNotification(
                 user,
                 NotificationType.VACCINATION_DUE,
                 "Vaccination Due 💉",
                 petName + "'s " + vaccineName +
                         " vaccination is due on " + dueDate + ".",
-                "/health/" + vaccinationId + "/vaccinations",
+                "/pets",   // ✅ go to pets list, user selects pet
                 vaccinationId
         );
+
+        try {
+            emailService.sendVaccinationReminderEmail(
+                    user.getEmail(),
+                    user.getFullName(),
+                    petName,
+                    vaccineName,
+                    dueDate,
+                    false
+            );
+        } catch (Exception e) {
+            log.warn("Vaccination due email failed: {}",
+                    e.getMessage());
+        }
+    }
+
+    @Transactional
+    public void sendVaccinationDueNotification(
+            User   user,
+            Long   vaccinationId,
+            Long   petId,
+            String petName,
+            String vaccineName,
+            String dueDate
+    ) {
+        // ✅ PREFERRED overload — includes petId for exact URL
+        createNotification(
+                user,
+                NotificationType.VACCINATION_DUE,
+                "Vaccination Due 💉",
+                petName + "'s " + vaccineName +
+                        " vaccination is due on " + dueDate + ".",
+                "/health/" + petId + "/vaccinations",  // ✅ exact URL
+                vaccinationId
+        );
+
+        try {
+            emailService.sendVaccinationReminderEmail(
+                    user.getEmail(),
+                    user.getFullName(),
+                    petName,
+                    vaccineName,
+                    dueDate,
+                    false
+            );
+        } catch (Exception e) {
+            log.warn("Vaccination due email failed: {}",
+                    e.getMessage());
+        }
     }
 
     @Transactional
@@ -309,17 +473,161 @@ public class NotificationService {
                 NotificationType.VACCINATION_OVERDUE,
                 "⚠️ Vaccination Overdue",
                 petName + "'s " + vaccineName +
-                        " vaccination is overdue. Please schedule immediately.",
-                "/health/" + vaccinationId + "/vaccinations",
+                        " vaccination is overdue — " +
+                        "please schedule immediately.",
+                "/pets",   // ✅ go to pets list
                 vaccinationId
         );
+
+        try {
+            emailService.sendVaccinationReminderEmail(
+                    user.getEmail(),
+                    user.getFullName(),
+                    petName,
+                    vaccineName,
+                    "Overdue",
+                    true
+            );
+        } catch (Exception e) {
+            log.warn("Vaccination overdue email failed: {}",
+                    e.getMessage());
+        }
+    }
+
+    @Transactional
+    public void sendVaccinationOverdueNotification(
+            User   user,
+            Long   vaccinationId,
+            Long   petId,
+            String petName,
+            String vaccineName
+    ) {
+        // ✅ PREFERRED overload — includes petId for exact URL
+        createNotification(
+                user,
+                NotificationType.VACCINATION_OVERDUE,
+                "⚠️ Vaccination Overdue",
+                petName + "'s " + vaccineName +
+                        " vaccination is overdue — " +
+                        "please schedule immediately.",
+                "/health/" + petId + "/vaccinations",  // ✅ exact URL
+                vaccinationId
+        );
+
+        try {
+            emailService.sendVaccinationReminderEmail(
+                    user.getEmail(),
+                    user.getFullName(),
+                    petName,
+                    vaccineName,
+                    "Overdue",
+                    true
+            );
+        } catch (Exception e) {
+            log.warn("Vaccination overdue email failed: {}",
+                    e.getMessage());
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // COMMUNITY NOTIFICATIONS
+    // ═══════════════════════════════════════════════════════════
+
+    @Transactional
+    public void sendCommunityReplyNotification(
+            User   user,
+            Long   postId,
+            String replierName,
+            String postTitle
+    ) {
+        createNotification(
+                user,
+                NotificationType.COMMUNITY_REPLY,
+                "New Reply on Your Post 💬",
+                replierName + " replied to: \"" +
+                        postTitle + "\"",
+                "/community/post/" + postId,  // ✅ matches App.jsx
+                postId
+        );
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // SCHEDULER — Vaccination Reminders (8AM daily)
+    // ═══════════════════════════════════════════════════════════
+
+    @Scheduled(cron = "0 0 8 * * *")
+    @Transactional
+    public void runVaccinationReminderJob() {
+        log.info("═══ Vaccination reminder job START ═══");
+
+        LocalDate today   = LocalDate.now();
+        LocalDate in7Days = today.plusDays(7);
+
+        // ── Overdue ───────────────────────────────────────────
+        try {
+            List<Vaccination> overdue =
+                    vaccinationRepository.findOverdue(today);
+
+            log.info("Overdue vaccinations found: {}",
+                    overdue.size());
+
+            for (Vaccination v : overdue) {
+                try {
+                    // ✅ Use overload with petId for exact URL
+                    sendVaccinationOverdueNotification(
+                            v.getPet().getOwner(),
+                            v.getId(),
+                            v.getPet().getId(),      // ← petId
+                            v.getPet().getName(),
+                            v.getName()
+                    );
+                } catch (Exception e) {
+                    log.warn("Overdue reminder failed | v={} | {}",
+                            v.getId(), e.getMessage());
+                }
+            }
+        } catch (Exception e) {
+            log.error("Overdue check failed: {}", e.getMessage());
+        }
+
+        // ── Due within 7 days ──────────────────────────────────
+        try {
+            List<Vaccination> dueSoon =
+                    vaccinationRepository.findDueBetween(
+                            today, in7Days);
+
+            log.info("Vaccinations due in 7 days: {}",
+                    dueSoon.size());
+
+            for (Vaccination v : dueSoon) {
+                try {
+                    // ✅ Use overload with petId for exact URL
+                    sendVaccinationDueNotification(
+                            v.getPet().getOwner(),
+                            v.getId(),
+                            v.getPet().getId(),      // ← petId
+                            v.getPet().getName(),
+                            v.getName(),
+                            v.getNextDueDate().format(DATE_FMT)
+                    );
+                } catch (Exception e) {
+                    log.warn("Due-soon reminder failed | v={} | {}",
+                            v.getId(), e.getMessage());
+                }
+            }
+        } catch (Exception e) {
+            log.error("Due-soon check failed: {}",
+                    e.getMessage());
+        }
+
+        log.info("═══ Vaccination reminder job END ═══");
     }
 
     // ═══════════════════════════════════════════════════════════
     // MAPPING
     // ═══════════════════════════════════════════════════════════
 
-    private NotificationDTO toDTO(Notification n) {
+    public NotificationDTO toDTO(Notification n) {
         return NotificationDTO.builder()
                 .id(n.getId())
                 .type(n.getType())

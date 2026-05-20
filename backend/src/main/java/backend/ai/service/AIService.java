@@ -101,13 +101,21 @@ public class AIService {
                 .build();
 
         ScanResult saved = scanResultRepository.save(scanResult);
-        notificationService.sendAIScanNotification(
-                owner,
-                saved.getId(),
-                saved.getPrediction(),
-                saved.getSeverity().name(),
-                saved.getVetConnectTriggered() != null && saved.getVetConnectTriggered()
-        );
+
+        // ── UPDATED: Send notification with pet name ────────────────
+        try {
+            notificationService.sendAIScanNotification(
+                    owner,
+                    saved.getId(),
+                    saved.getPrediction(),
+                    saved.getSeverity().name(),
+                    saved.getVetConnectTriggered() != null && saved.getVetConnectTriggered(),
+                    pet.getName()    // ← Added pet name parameter
+            );
+        } catch (Exception e) {
+            log.warn("Notification failed for scan {}: {}", saved.getId(), e.getMessage());
+        }
+
         log.info(
                 "Scan saved | id={} pet={} class='{}' severity={} confidence={}",
                 saved.getId(), petId,

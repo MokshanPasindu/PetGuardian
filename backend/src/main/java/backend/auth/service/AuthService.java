@@ -70,7 +70,13 @@ public class AuthService {
                 .build();
 
         User savedUser = userRepository.save(user);
-        notificationService.sendWelcomeNotification(savedUser);
+        // ── Send welcome notification + email ─────────────────────
+        try {
+            notificationService.sendWelcomeNotification(savedUser);
+        } catch (Exception e) {
+            log.warn("Welcome notification failed for user {}: {}",
+                    savedUser.getId(), e.getMessage());
+        }
 
         String token = jwtTokenProvider.generateToken(savedUser.getEmail());
         String refreshToken = jwtTokenProvider.generateRefreshToken(savedUser.getEmail());
